@@ -75,6 +75,7 @@ export default function BedsPage() {
   const [dischargeAt, setDischargeAt] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   function getDefaultDischargeTime() {
     const value = new Date(Date.now() + 2 * 60 * 60 * 1000);
@@ -85,6 +86,7 @@ export default function BedsPage() {
 
   const loadData = useCallback(async () => {
     try {
+      setLoadError(null);
       const [wardData, bedData, predictionData] = await Promise.all([
         getAllWards(),
         getAllBeds(),
@@ -95,6 +97,11 @@ export default function BedsPage() {
       setBeds(bedData);
       setPredictions(predictionData);
       wardData.forEach((ward) => joinWard(ward.id));
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load bed allocation data."
+      );
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -220,6 +227,12 @@ export default function BedsPage() {
       {notice && (
         <div className="rounded-[26px] border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700 shadow-sm">
           {notice}
+        </div>
+      )}
+
+      {loadError && (
+        <div className="rounded-3xl border border-amber-100 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800 shadow-sm">
+          {loadError}
         </div>
       )}
 

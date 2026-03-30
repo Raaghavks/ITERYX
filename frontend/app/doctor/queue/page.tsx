@@ -39,6 +39,7 @@ export default function DoctorQueuePage() {
   const [wards, setWards] = useState<Ward[]>([]);
   const [filter, setFilter] = useState<QueueFilter>("waiting");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<number | null>(null);
   const [activeEntry, setActiveEntry] = useState<QueueEntry | null>(null);
   const [selectedWardId, setSelectedWardId] = useState<string>("");
@@ -51,6 +52,7 @@ export default function DoctorQueuePage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      setLoadError(null);
       const [queueData, wardData] = await Promise.all([
         getQueue(filter === "all" ? undefined : filter),
         getAllWards(),
@@ -66,21 +68,22 @@ export default function DoctorQueuePage() {
 
       setEntries(queueData);
       setWards(wardData);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load doctor queue.");
+      throw error;
     } finally {
       setLoading(false);
     }
   }, [filter]);
 
   const { connectionState, isFallbackPolling, lastSyncAt, refreshNow } =
-    useRealtimeSync({
-      load,
-      pollIntervalMs: 25000,
-      staleAfterMs: 45000,
-    });
+    useRealtimeSync({ load, pollIntervalMs: 25000, staleAfterMs: 45000 });
 
   useEffect(() => {
     const socket = getSocket();
-    const handler = () => load();
+    const handler = () => {
+      void load();
+    };
     socket.on("queue_update", handler);
     socket.on("bed_status_update", handler);
     return () => {
@@ -154,9 +157,7 @@ export default function DoctorQueuePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.24em] ${
-            connectionState === "live"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-amber-50 text-amber-700"
+            connectionState === "live" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
           }`}
         >
           <span
@@ -171,15 +172,11 @@ export default function DoctorQueuePage() {
           <span>
             Last sync{" "}
             {lastSyncAt
-              ? lastSyncAt.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })
+              ? lastSyncAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
               : "pending"}
           </span>
           <button
-            onClick={() => refreshNow()}
+            onClick={() => void refreshNow()}
             className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
           >
             <RefreshCw className="h-4 w-4" />
@@ -191,6 +188,12 @@ export default function DoctorQueuePage() {
       {notice && (
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
           {notice}
+        </div>
+      )}
+
+      {loadError && (
+        <div className="rounded-3xl border border-amber-100 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800 shadow-sm">
+          {loadError}
         </div>
       )}
 
@@ -206,9 +209,7 @@ export default function DoctorQueuePage() {
             key={item}
             onClick={() => setFilter(item)}
             className={`rounded-xl px-5 py-2 text-sm font-semibold transition-all ${
-              filter === item
-                ? "bg-slate-900 text-white shadow-sm"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+              filter === item ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
             }`}
           >
             {item === "all" ? "All" : STATUS_LABEL[item]}
@@ -243,18 +244,16 @@ export default function DoctorQueuePage() {
 
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center gap-3">
-                    <h3 className="truncate font-bold text-slate-800">
-                      {entry.patient?.name ?? entry.name}
-                    </h3>
+                    <h3 className="truncate font-bold text-slate-800">{entry.patient?.name ?? entry.name}</h3>
                     <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${style.badge}`}>
                       {priority}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                    <span>{entry.patient?.age ?? entry.age}y · {entry.patient?.gender ?? entry.gender}</span>
-                    <span className="font-semibold text-slate-600">
-                      Score: {entry.triage?.score ?? entry.score}
+                    <span>
+                      {entry.patient?.age ?? entry.age}y · {entry.patient?.gender ?? entry.gender}
                     </span>
+                    <span className="font-semibold text-slate-600">Score: {entry.triage?.score ?? entry.score}</span>
                     <span className="flex items-center gap-1">
                       <Stethoscope className="h-3 w-3" />
                       {entry.doctor?.name ?? "Doctor Pending"}
@@ -279,7 +278,7 @@ export default function DoctorQueuePage() {
 
                   {entry.status === "waiting" && (
                     <button
-                      onClick={() => changeStatus(entry.id, "in_consultation")}
+                      onClick={() => void changeStatus(entry.id, "in_consultation")}
                       disabled={updating === entry.id}
                       className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
                     >
@@ -296,7 +295,7 @@ export default function DoctorQueuePage() {
                         Reserve Bed
                       </button>
                       <button
-                        onClick={() => changeStatus(entry.id, "completed")}
+                        onClick={() => void changeStatus(entry.id, "completed")}
                         disabled={updating === entry.id}
                         className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
                       >
@@ -321,10 +320,7 @@ export default function DoctorQueuePage() {
                   {activeEntry.patient?.name ?? activeEntry.name} · {activeEntry.chief_complaint}
                 </p>
               </div>
-              <button
-                onClick={closeAdmission}
-                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-200"
-              >
+              <button onClick={closeAdmission} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-200">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -332,18 +328,12 @@ export default function DoctorQueuePage() {
             <div className="space-y-6 p-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">
-                    Priority
-                  </p>
+                  <p className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Priority</p>
                   <p className="text-lg font-bold text-slate-800">{activeEntry.priority_level}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">
-                    Assigned Doctor
-                  </p>
-                  <p className="text-lg font-bold text-slate-800">
-                    {activeEntry.doctor?.name ?? "Doctor Pending"}
-                  </p>
+                  <p className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-400">Assigned Doctor</p>
+                  <p className="text-lg font-bold text-slate-800">{activeEntry.doctor?.name ?? "Doctor Pending"}</p>
                 </div>
               </div>
 
@@ -368,7 +358,7 @@ export default function DoctorQueuePage() {
                   </div>
 
                   <button
-                    onClick={handleReserveBed}
+                    onClick={() => void handleReserveBed()}
                     disabled={allocating}
                     className="w-full rounded-2xl bg-amber-500 py-3.5 font-bold text-white transition hover:bg-amber-600 disabled:opacity-50"
                   >
@@ -395,7 +385,7 @@ export default function DoctorQueuePage() {
                   </div>
 
                   <button
-                    onClick={handleAdmission}
+                    onClick={() => void handleAdmission()}
                     disabled={admitting}
                     className="w-full rounded-2xl bg-emerald-600 py-3.5 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
                   >

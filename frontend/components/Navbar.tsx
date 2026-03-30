@@ -11,13 +11,15 @@ export default function Navbar() {
   const [hasEmergency, setHasEmergency] = useState(false);
 
   useEffect(() => {
-    socketService.onEmergencyAlert(() => {
+    const handleEmergencyAlert = () => {
       setHasEmergency(true);
       // Optional sound or toaster notification could go here
-    });
+    };
+
+    socketService.onEmergencyAlert(handleEmergencyAlert);
 
     return () => {
-      socketService.removeListener('emergency_alert');
+      socketService.removeListener("emergency_alert", handleEmergencyAlert);
     };
   }, []);
 

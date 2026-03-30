@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getDoctors, registerPatient } from "@/lib/api";
 import type { Doctor, Priority, RegistrationResult } from "@/types";
 import { Activity, AlertTriangle, CheckCircle, User } from "lucide-react";
@@ -32,6 +33,7 @@ export default function OPDRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RegistrationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [doctorsError, setDoctorsError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -49,7 +51,17 @@ export default function OPDRegisterPage() {
   });
 
   useEffect(() => {
-    getDoctors().then(setDoctors).catch(console.error);
+    getDoctors()
+      .then((data) => {
+        setDoctors(data);
+        setDoctorsError(null);
+      })
+      .catch((loadError) => {
+        console.error(loadError);
+        setDoctorsError(
+          loadError instanceof Error ? loadError.message : "Unable to load doctors."
+        );
+      });
   }, []);
 
   function toggleSymptom(symptom: string) {
@@ -129,7 +141,9 @@ export default function OPDRegisterPage() {
           <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
             <CheckCircle className="h-10 w-10 text-emerald-500" />
           </div>
-          <h2 className="mb-1 text-2xl font-bold text-slate-800">Registration Complete</h2>
+          <h2 className="mb-1 text-2xl font-bold text-slate-800">
+            Registration Complete
+          </h2>
           <p className="mb-8 text-sm text-slate-500">
             Patient successfully registered and added to the queue.
           </p>
@@ -146,13 +160,17 @@ export default function OPDRegisterPage() {
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Queue Position
               </p>
-              <p className="text-3xl font-black text-indigo-600">#{result.queue_position}</p>
+              <p className="text-3xl font-black text-indigo-600">
+                #{result.queue_position}
+              </p>
             </div>
             <div className="rounded-2xl bg-slate-50 p-4 text-left">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Triage Score
               </p>
-              <p className="text-3xl font-black text-slate-800">{result.triage_score}</p>
+              <p className="text-3xl font-black text-slate-800">
+                {result.triage_score}
+              </p>
             </div>
             <div className="flex flex-col gap-2 rounded-2xl bg-slate-50 p-4 text-left">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -173,12 +191,12 @@ export default function OPDRegisterPage() {
             >
               Register Another
             </button>
-            <a
+            <Link
               href="/doctor/queue"
               className="flex-1 rounded-xl bg-indigo-50 py-3 text-center text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
             >
               View Queue →
-            </a>
+            </Link>
           </div>
         </div>
       ) : (
@@ -257,6 +275,12 @@ export default function OPDRegisterPage() {
                   ))}
               </select>
             </div>
+
+            {doctorsError && (
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                {doctorsError}
+              </div>
+            )}
 
             <div>
               <label className={labelClassName}>Symptoms *</label>
