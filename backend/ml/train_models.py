@@ -94,7 +94,7 @@ def train_triage_model() -> None:
     print("  MODEL 1 - Triage Scoring (XGBoost Classifier)")
     print("=" * 60)
 
-    df = generate_triage_data(1000)
+    df = generate_triage_data(50000)
 
     print(f"\n[DATA]  Generated {len(df)} synthetic patient rows")
     print(f"    Class distribution:\n{df['priority_level'].value_counts().to_string()}\n")
@@ -169,7 +169,7 @@ def train_bed_model() -> None:
     print("  MODEL 2 - Bed Vacancy Prediction (GradientBoosting)")
     print("=" * 60)
 
-    df = generate_bed_data(500)
+    df = generate_bed_data(20000)
 
     print(f"\n[DATA]  Generated {len(df)} synthetic occupancy rows")
     print(f"    Target range: {df['predicted_free_beds'].min()} - {df['predicted_free_beds'].max()}\n")
