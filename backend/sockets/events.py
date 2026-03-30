@@ -63,3 +63,16 @@ async def emit_emergency_alert(patient_name, priority, score):
         "timestamp": datetime.utcnow().isoformat()
     }
     await sio.emit("emergency_alert", payload)
+
+
+async def emit_discharge_order_update(event, order_id, patient_id, bed_id=None):
+    """
+    Emits 'discharge_order_update' to all connected clients.
+    """
+    payload = {
+        "event": event,
+        "order_id": order_id,
+        "patient_id": patient_id,
+        "bed_id": bed_id,
+    }
+    await sio.emit("discharge_order_update", payload)

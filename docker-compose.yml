@@ -3,6 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
+    container_name: iteryx-db
     ports:
       - "5432:5432"
     environment:
@@ -11,33 +12,55 @@ services:
       POSTGRES_PASSWORD: admin123
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - iteryx-network
 
   redis:
     image: redis:7-alpine
+    container_name: iteryx-redis
     ports:
       - "6379:6379"
+    networks:
+      - iteryx-network
 
   backend:
     build:
       context: ./backend
+    container_name: iteryx-backend
     ports:
       - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://admin:admin123@postgres:5432/hospital_db
+      - REDIS_URL=redis://redis:6379
+      - PORT=8000
     depends_on:
       - postgres
       - redis
-    env_file: .env
     volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
+    networks:
+      - iteryx-network
 
   frontend:
     build:
       context: ./frontend
-      # Please define your frontend Dockerfile when ready
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+        - NEXT_PUBLIC_SOCKET_URL=http://localhost:8000
+    container_name: iteryx-frontend
     ports:
       - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:8000
     depends_on:
       - backend
-    env_file: .env
+    networks:
+      - iteryx-network
+
+networks:
+  iteryx-network:
+    driver: bridge
 
 volumes:
   postgres_data:

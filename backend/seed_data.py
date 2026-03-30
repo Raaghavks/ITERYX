@@ -5,27 +5,27 @@ from pathlib import Path
 
 import psycopg2
 from psycopg2 import sql
-from psycopg2.extras import execute_values
+from psycopg2.extras import RealDictCursor, execute_values
 from dotenv import load_dotenv
 
 
 WARD_ROWS = [
-    {"name": "General Ward", "location": "Floor 1", "bed_count": 20},
-    {"name": "ICU", "location": "Floor 2", "bed_count": 10},
-    {"name": "Pediatric Ward", "location": "Floor 1", "bed_count": 15},
-    {"name": "Orthopedic Ward", "location": "Floor 3", "bed_count": 12},
-    {"name": "Emergency Ward", "location": "Floor 0", "bed_count": 8},
+    {"name": "General Ward", "floor": 1, "total_beds": 20},
+    {"name": "ICU", "floor": 2, "total_beds": 10},
+    {"name": "Pediatric Ward", "floor": 1, "total_beds": 15},
+    {"name": "Orthopedic Ward", "floor": 3, "total_beds": 12},
+    {"name": "Emergency Ward", "floor": 0, "total_beds": 8},
 ]
 
 DOCTOR_ROWS = [
-    ("Dr. Arun Sharma", "General Physician", "available"),
-    ("Dr. Priya Nair", "Cardiologist", "available"),
-    ("Dr. Karan Mehta", "Pediatrician", "available"),
-    ("Dr. Sneha Iyer", "Emergency Medicine", "available"),
-    ("Dr. Raj Patel", "Orthopedic Surgeon", "unavailable"),
-    ("Dr. Meera Krishnan", "General Physician", "available"),
-    ("Dr. Vikram Das", "Pulmonologist", "available"),
-    ("Dr. Anitha Rao", "Neurologist", "unavailable"),
+    ("Dr. Arun Sharma", "General Physician", True),
+    ("Dr. Priya Nair", "Cardiologist", True),
+    ("Dr. Karan Mehta", "Pediatrician", True),
+    ("Dr. Sneha Iyer", "Emergency Medicine", True),
+    ("Dr. Raj Patel", "Orthopedic Surgeon", False),
+    ("Dr. Meera Krishnan", "General Physician", True),
+    ("Dr. Vikram Das", "Pulmonologist", True),
+    ("Dr. Anitha Rao", "Neurologist", False),
 ]
 
 PATIENT_NAMES = [
@@ -71,6 +71,13 @@ SYMPTOM_POOL = [
     "seizure",
 ]
 
+PRIORITY_TO_SCORE = {
+    "CRITICAL": 95.0,
+    "HIGH": 72.0,
+    "MEDIUM": 52.0,
+    "LOW": 24.0,
+}
+
 
 def load_environment():
     backend_dir = Path(__file__).resolve().parent
@@ -79,14 +86,11 @@ def load_environment():
     load_dotenv(backend_dir / ".env")
 
 
-
 def get_connection():
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is not set. Add it to .env before running seed_data.py")
-
-    return psycopg2.connect(database_url)
-
+    return psycopg2.connect(database_url, cursor_factory=RealDictCursor)
 
 
 def truncate_all_tables(cursor):
@@ -98,8 +102,7 @@ def truncate_all_tables(cursor):
         ORDER BY tablename;
         """
     )
-    tables = [row[0] for row in cursor.fetchall()]
-
+    tables = [row["tablename"] for row in cursor.fetchall()]
     if not tables:
         return
 
@@ -109,43 +112,42 @@ def truncate_all_tables(cursor):
     cursor.execute(query)
 
 
-
 def insert_wards(cursor):
-    ward_payload = [(row["name"], row["location"], row["bed_count"]) for row in WARD_ROWS]
+    ward_payload = [(row["name"], row["total_beds"], row["floor"]) for row in WARD_ROWS]
     execute_values(
         cursor,
         """
-        INSERT INTO wards (name, location, bed_count)
+        INSERT INTO wards (name, total_beds, floor)
         VALUES %s
-        RETURNING id, bed_count;
+        RETURNING id, total_beds;
         """,
         ward_payload,
     )
     wards = cursor.fetchall()
-    print("✅ Wards inserted")
+    print("[ok] wards inserted")
     return wards
 
 
-
 def build_statuses(total):
-    # Largest remainder allocation to keep totals exact.
     weighted = {
-        "occupied": total * 0.60,
-        "available": total * 0.25,
-        "reserved": total * 0.10,
-        "maintenance": total * 0.05,
+        "OCCUPIED": total * 0.55,
+        "AVAILABLE": total * 0.25,
+        "RESERVED": total * 0.15,
+        "MAINTENANCE": total * 0.05,
     }
 
-    base_counts = {k: int(v) for k, v in weighted.items()}
+    base_counts = {key: int(value) for key, value in weighted.items()}
     assigned = sum(base_counts.values())
     remainder = total - assigned
 
     if remainder > 0:
         by_fraction = sorted(
-            weighted.items(), key=lambda kv: (kv[1] - int(kv[1])), reverse=True
+            weighted.items(),
+            key=lambda item: (item[1] - int(item[1])),
+            reverse=True,
         )
-        for idx in range(remainder):
-            base_counts[by_fraction[idx][0]] += 1
+        for index in range(remainder):
+            base_counts[by_fraction[index][0]] += 1
 
     statuses = []
     for status, count in base_counts.items():
@@ -155,214 +157,280 @@ def build_statuses(total):
     return statuses
 
 
-
 def insert_beds(cursor, ward_rows):
-    total_beds = sum(row[1] for row in ward_rows)
+    total_beds = sum(row["total_beds"] for row in ward_rows)
     statuses = build_statuses(total_beds)
+    now = datetime.now(timezone.utc)
 
     bed_rows = []
-    bed_number = 1
     status_index = 0
-
-    for ward_id, ward_bed_count in ward_rows:
-        for _ in range(ward_bed_count):
+    for row in ward_rows:
+        ward_id = row["id"]
+        ward_bed_count = row["total_beds"]
+        for local_index in range(ward_bed_count):
             bed_rows.append(
                 (
                     ward_id,
-                    f"B{bed_number:03d}",
+                    f"B{ward_id:02d}-{local_index + 1:02d}",
                     statuses[status_index],
+                    now,
                 )
             )
-            bed_number += 1
             status_index += 1
 
     execute_values(
         cursor,
         """
-        INSERT INTO beds (ward_id, bed_number, status)
-        VALUES %s;
+        INSERT INTO beds (ward_id, bed_number, status, last_updated)
+        VALUES %s
+        RETURNING id, ward_id, bed_number, status;
         """,
         bed_rows,
     )
-    print(f"✅ Beds inserted ({len(bed_rows)} total)")
-
+    beds = cursor.fetchall()
+    print(f"[ok] beds inserted ({len(beds)} total)")
+    return beds
 
 
 def insert_doctors(cursor):
     execute_values(
         cursor,
         """
-        INSERT INTO doctors (name, specialization, status)
+        INSERT INTO doctors (name, specialization, is_available)
         VALUES %s
-        RETURNING id, status;
+        RETURNING id, is_available;
         """,
         DOCTOR_ROWS,
     )
     doctors = cursor.fetchall()
-    print("✅ Doctors inserted")
+    print("[ok] doctors inserted")
     return doctors
-
 
 
 def insert_patients(cursor):
     random.seed(42)
     ages = [5, 8, 11, 14, 17, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 52, 56, 60, 64, 68, 72, 76, 79, 82, 85]
     genders = ["male", "female", "male", "female", "male"]
+    now = datetime.now(timezone.utc)
 
     patient_rows = []
-    for idx, name in enumerate(PATIENT_NAMES):
-        patient_rows.append((name, ages[idx], genders[idx % len(genders)]))
+    for index, name in enumerate(PATIENT_NAMES):
+        patient_rows.append(
+            (
+                name,
+                ages[index],
+                genders[index % len(genders)],
+                f"9{index + 1:09d}",
+                now - timedelta(minutes=index * 7),
+            )
+        )
 
     execute_values(
         cursor,
         """
-        INSERT INTO patients (name, age, gender)
+        INSERT INTO patients (name, age, gender, contact, registered_at)
         VALUES %s
         RETURNING id;
         """,
         patient_rows,
     )
-    patient_ids = [row[0] for row in cursor.fetchall()]
-    print("✅ Patients inserted")
+    patient_ids = [row["id"] for row in cursor.fetchall()]
+    print("[ok] patients inserted")
     return patient_ids
-
 
 
 def insert_vitals(cursor, patient_ids):
     random.seed(43)
-    shuffled = patient_ids[:]
-    random.shuffle(shuffled)
-
-    critical = shuffled[:5]
-    moderate = shuffled[5:13]
-    normal = shuffled[13:]
-
     vitals_rows = []
+    now = datetime.now(timezone.utc)
 
-    for pid in critical:
-        if random.random() < 0.5:
-            spo2 = random.randint(82, 89)
-            heart_rate = random.randint(95, 118)
-        else:
-            spo2 = random.randint(90, 95)
-            heart_rate = random.randint(121, 145)
-
+    for index, patient_id in enumerate(patient_ids):
         vitals_rows.append(
             (
-                pid,
-                heart_rate,
-                random.randint(100, 115),
-                random.randint(65, 78),
-                round(random.uniform(99.2, 102.1), 1),
-                spo2,
-                random.randint(20, 32),
-            )
-        )
-
-    for pid in moderate:
-        vitals_rows.append(
-            (
-                pid,
-                random.randint(95, 118),
-                random.randint(118, 138),
-                random.randint(78, 89),
-                round(random.uniform(98.8, 100.4), 1),
-                random.randint(90, 94),
-                random.randint(17, 22),
-            )
-        )
-
-    for pid in normal:
-        vitals_rows.append(
-            (
-                pid,
+                patient_id,
+                random.randint(108, 145),
                 random.randint(68, 96),
-                random.randint(108, 126),
-                random.randint(68, 82),
-                round(random.uniform(97.7, 99.2), 1),
-                random.randint(95, 100),
-                random.randint(12, 18),
+                random.randint(88, 100),
+                round(random.uniform(97.6, 101.4), 1),
+                random.randint(68, 135),
+                now - timedelta(minutes=index * 5),
             )
         )
 
     execute_values(
         cursor,
         """
-        INSERT INTO vitals (patient_id, heart_rate, bp_systolic, bp_diastolic, temperature, spo2, respiratory_rate)
+        INSERT INTO vitals (patient_id, bp_systolic, bp_diastolic, spo2, temperature, heart_rate, recorded_at)
         VALUES %s;
         """,
         vitals_rows,
     )
-    print("✅ Vitals inserted")
-
+    print("[ok] vitals inserted")
 
 
 def insert_symptoms(cursor, patient_ids):
     random.seed(44)
     symptom_rows = []
 
-    for pid in patient_ids:
+    for patient_id in patient_ids:
         count = random.randint(1, 3)
         picked = random.sample(SYMPTOM_POOL, count)
         for symptom in picked:
-            symptom_rows.append((pid, symptom))
+            severity = random.randint(2, 5) if symptom in {"chest pain", "breathing difficulty", "unconscious", "seizure"} else random.randint(1, 4)
+            symptom_rows.append((patient_id, symptom, severity))
 
     execute_values(
         cursor,
         """
-        INSERT INTO symptoms (patient_id, symptom)
+        INSERT INTO symptoms (patient_id, symptom_text, severity_code)
         VALUES %s;
         """,
         symptom_rows,
     )
-    print("✅ Symptoms inserted")
+    print("[ok] symptoms inserted")
 
 
+def classify_patient(index):
+    if index < 4:
+        return "CRITICAL"
+    if index < 10:
+        return "HIGH"
+    if index < 18:
+        return "MEDIUM"
+    return "LOW"
 
-def insert_opd_queue(cursor, patient_ids, doctor_rows):
-    random.seed(45)
-    available_doctor_ids = [doctor_id for doctor_id, status in doctor_rows if status == "available"]
-    selected_patients = random.sample(patient_ids, 15)
 
+def insert_queue_and_triage(cursor, patient_ids, doctors):
+    available_doctor_ids = [row["id"] for row in doctors if row["is_available"]]
+    queue_patient_ids = patient_ids[:15]
+    now = datetime.now(timezone.utc)
+
+    triage_rows = []
     queue_rows = []
-    for idx, patient_id in enumerate(selected_patients):
-        doctor_id = available_doctor_ids[idx % len(available_doctor_ids)]
-        queue_rows.append((patient_id, doctor_id, "waiting"))
+
+    for position, patient_id in enumerate(queue_patient_ids, start=1):
+        priority = classify_patient(position - 1)
+        score = PRIORITY_TO_SCORE[priority] - (position * 0.3)
+        computed_at = now - timedelta(minutes=position * 4)
+        triage_rows.append((patient_id, score, priority, position, computed_at))
+
+        queue_rows.append(
+            (
+                patient_id,
+                available_doctor_ids[(position - 1) % len(available_doctor_ids)],
+                position,
+                "WAITING",
+                now - timedelta(minutes=position * 4),
+            )
+        )
 
     execute_values(
         cursor,
         """
-        INSERT INTO opd_queue (patient_id, doctor_id, status)
+        INSERT INTO triage_scores (patient_id, score, priority_level, queue_position, computed_at)
+        VALUES %s;
+        """,
+        triage_rows,
+    )
+
+    execute_values(
+        cursor,
+        """
+        INSERT INTO opd_queue (patient_id, doctor_id, queue_position, status, created_at)
         VALUES %s;
         """,
         queue_rows,
     )
-    print("✅ OPD Queue inserted")
+    print("[ok] triage scores and opd queue inserted")
 
 
-
-def insert_discharge_orders(cursor, patient_ids, doctor_rows):
-    random.seed(46)
-    chosen_patients = random.sample(patient_ids, 3)
-    doctor_ids = [doc[0] for doc in doctor_rows]
+def assign_beds_and_admissions(cursor, beds, patient_ids, doctors):
+    random.seed(45)
+    available_doctor_ids = [row["id"] for row in doctors if row["is_available"]]
+    free_patient_ids = patient_ids[15:]
     now = datetime.now(timezone.utc)
 
+    occupied_beds = [bed for bed in beds if bed["status"] == "OCCUPIED"]
+    reserved_beds = [bed for bed in beds if bed["status"] == "RESERVED"]
+
+    occupied_assignments = []
+    admission_rows = []
+
+    for index, bed in enumerate(occupied_beds[:8]):
+        patient_id = free_patient_ids[index]
+        doctor_id = available_doctor_ids[index % len(available_doctor_ids)]
+        admitted_at = now - timedelta(hours=index + 2)
+        occupied_assignments.append((patient_id, bed["id"]))
+        admission_rows.append((patient_id, bed["id"], doctor_id, admitted_at))
+
+    if occupied_assignments:
+        execute_values(
+            cursor,
+            """
+            UPDATE beds AS b
+            SET assigned_patient_id = v.patient_id
+            FROM (VALUES %s) AS v(patient_id, bed_id)
+            WHERE b.id = v.bed_id;
+            """,
+            occupied_assignments,
+        )
+
+        execute_values(
+            cursor,
+            """
+            INSERT INTO admissions (patient_id, bed_id, doctor_id, admitted_at)
+            VALUES %s;
+            """,
+            admission_rows,
+        )
+
+    reserved_assignments = []
+    for offset, bed in enumerate(reserved_beds[:4], start=len(occupied_assignments)):
+        if offset >= len(free_patient_ids):
+            break
+        reserved_assignments.append((free_patient_ids[offset], bed["id"]))
+
+    if reserved_assignments:
+        execute_values(
+            cursor,
+            """
+            UPDATE beds AS b
+            SET assigned_patient_id = v.patient_id
+            FROM (VALUES %s) AS v(patient_id, bed_id)
+            WHERE b.id = v.bed_id;
+            """,
+            reserved_assignments,
+        )
+
+    print("[ok] admissions and bed assignments inserted")
+    return admission_rows
+
+
+def insert_discharge_orders(cursor, admission_rows):
+    now = datetime.now(timezone.utc)
     discharge_rows = []
-    for patient_id in chosen_patients:
-        expected_at = now + timedelta(minutes=random.randint(10, 120))
-        doctor_id = random.choice(doctor_ids)
-        discharge_rows.append((patient_id, doctor_id, expected_at))
 
-    execute_values(
-        cursor,
-        """
-        INSERT INTO discharge_orders (patient_id, doctor_id, expected_discharge_at)
-        VALUES %s;
-        """,
-        discharge_rows,
-    )
-    print("✅ Discharge orders inserted")
+    for index, (patient_id, bed_id, doctor_id, _) in enumerate(admission_rows[:3]):
+        discharge_rows.append(
+            (
+                patient_id,
+                bed_id,
+                doctor_id,
+                now + timedelta(minutes=30 * (index + 1)),
+            )
+        )
 
+    if discharge_rows:
+        execute_values(
+            cursor,
+            """
+            INSERT INTO discharge_orders (patient_id, bed_id, doctor_id, expected_discharge_at)
+            VALUES %s;
+            """,
+            discharge_rows,
+        )
+
+    print("[ok] discharge orders inserted")
 
 
 def main():
@@ -376,17 +444,16 @@ def main():
                 truncate_all_tables(cursor)
 
                 ward_rows = insert_wards(cursor)
-                insert_beds(cursor, ward_rows)
-
-                doctor_rows = insert_doctors(cursor)
+                beds = insert_beds(cursor, ward_rows)
+                doctors = insert_doctors(cursor)
                 patient_ids = insert_patients(cursor)
-
                 insert_vitals(cursor, patient_ids)
                 insert_symptoms(cursor, patient_ids)
-                insert_opd_queue(cursor, patient_ids, doctor_rows)
-                insert_discharge_orders(cursor, patient_ids, doctor_rows)
+                insert_queue_and_triage(cursor, patient_ids, doctors)
+                admission_rows = assign_beds_and_admissions(cursor, beds, patient_ids, doctors)
+                insert_discharge_orders(cursor, admission_rows)
 
-        print("✅ All seed data inserted successfully.")
+        print("[ok] all seed data inserted successfully")
     except Exception as exc:
         connection.rollback()
         raise RuntimeError(f"Seeding failed: {exc}") from exc

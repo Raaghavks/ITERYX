@@ -15,10 +15,11 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from backend.api_contract import success_response
 from backend.database import get_db, set_redis_json
 from backend.sockets.events import emit_bed_update
 
@@ -26,6 +27,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["beds"])
 
 VALID_BED_STATUSES = {"available", "occupied", "reserved", "maintenance"}
+DB_BED_STATUSES = {status: status.upper() for status in VALID_BED_STATUSES}
+
+
+def from_db_bed_status(value: str) -> str:
+    return value.lower()
 
 
 # ── Pydantic request schemas ────────────────────────────────────────────
@@ -43,11 +49,19 @@ class PreAllocateRequest(BaseModel):
 # ── GET /api/beds ───────────────────────────────────────────────────────
 
 @router.get("/beds")
-async def get_all_beds():
+async def get_all_beds(
+    ward_id: Optional[int] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+):
     """Return all beds joined with ward name and assigned patient name, grouped by ward."""
+    if status and status not in VALID_BED_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status '{status}'. Must be one of: {', '.join(sorted(VALID_BED_STATUSES))}",
+        )
+
     with get_db() as cur:
-        cur.execute(
-            """
+        query = """
             SELECT
                 b.id        AS bed_id,
                 b.bed_number,
@@ -55,13 +69,35 @@ async def get_all_beds():
                 b.ward_id,
                 w.name      AS ward_name,
                 b.assigned_patient_id,
-                p.name      AS patient_name
+                p.name      AS patient_name,
+                a.admitted_at AS admitted_since,
+                d.id        AS doctor_id,
+                d.name      AS assigned_doctor
             FROM beds b
             JOIN wards w ON w.id = b.ward_id
             LEFT JOIN patients p ON p.id = b.assigned_patient_id
-            ORDER BY w.id, b.bed_number;
-            """
-        )
+            LEFT JOIN admissions a
+                ON a.bed_id = b.id
+               AND a.discharged_at IS NULL
+            LEFT JOIN doctors d ON d.id = a.doctor_id
+        """
+        params: list[object] = []
+        filters = []
+
+        if ward_id is not None:
+            filters.append("b.ward_id = %s")
+            params.append(ward_id)
+
+        if status is not None:
+            filters.append("b.status = %s")
+            params.append(DB_BED_STATUSES[status])
+
+        if filters:
+            query += " WHERE " + " AND ".join(filters)
+
+        query += " ORDER BY w.id, b.bed_number;"
+
+        cur.execute(query, params)
         rows = cur.fetchall()
 
     # Group by ward
@@ -78,13 +114,19 @@ async def get_all_beds():
             {
                 "bed_id": row["bed_id"],
                 "bed_number": row["bed_number"],
-                "status": row["status"],
+                "status": from_db_bed_status(row["status"]),
                 "assigned_patient_id": row["assigned_patient_id"],
                 "patient_name": row["patient_name"],
+                "admitted_since": row["admitted_since"].isoformat() if row["admitted_since"] else None,
+                "doctor_id": row["doctor_id"],
+                "assigned_doctor": row["assigned_doctor"],
             }
         )
 
-    return {"wards": list(wards_map.values())}
+    return success_response(
+        data={"wards": list(wards_map.values())},
+        message="Beds retrieved",
+    )
 
 
 # ── GET /api/wards ──────────────────────────────────────────────────────
@@ -98,12 +140,12 @@ async def get_wards_summary():
             SELECT
                 w.id                                          AS id,
                 w.name                                        AS name,
-                w.location                                    AS floor,
-                w.bed_count                                   AS total_beds,
-                COUNT(*) FILTER (WHERE b.status = 'available')    AS available_count,
-                COUNT(*) FILTER (WHERE b.status = 'occupied')     AS occupied_count,
-                COUNT(*) FILTER (WHERE b.status = 'reserved')     AS reserved_count,
-                COUNT(*) FILTER (WHERE b.status = 'maintenance')  AS maintenance_count
+                w.floor                                       AS floor,
+                w.total_beds                                  AS total_beds,
+                COUNT(*) FILTER (WHERE b.status = 'AVAILABLE')    AS available_count,
+                COUNT(*) FILTER (WHERE b.status = 'OCCUPIED')     AS occupied_count,
+                COUNT(*) FILTER (WHERE b.status = 'RESERVED')     AS reserved_count,
+                COUNT(*) FILTER (WHERE b.status = 'MAINTENANCE')  AS maintenance_count
             FROM wards w
             LEFT JOIN beds b ON b.ward_id = w.id
             GROUP BY w.id
@@ -121,7 +163,7 @@ async def get_wards_summary():
             {
                 "id": r["id"],
                 "name": r["name"],
-                "floor": r["floor"],
+                "floor": f"Floor {r['floor']}" if r["floor"] is not None else None,
                 "total_beds": r["total_beds"],
                 "available_count": r["available_count"],
                 "occupied_count": r["occupied_count"],
@@ -131,7 +173,10 @@ async def get_wards_summary():
             }
         )
 
-    return result
+    return success_response(
+        data=result,
+        message="Wards retrieved",
+    )
 
 
 # ── PATCH /api/beds/{bed_id}/status ─────────────────────────────────────
@@ -148,6 +193,11 @@ async def update_bed_status(bed_id: int, body: BedStatusUpdate):
         )
 
     with get_db() as cur:
+        cur.execute("SELECT status FROM beds WHERE id = %s", (bed_id,))
+        existing = cur.fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail=f"Bed {bed_id} not found")
+
         # Update bed
         cur.execute(
             """
@@ -157,12 +207,9 @@ async def update_bed_status(bed_id: int, body: BedStatusUpdate):
             WHERE id = %s
             RETURNING id, ward_id, bed_number, status, assigned_patient_id;
             """,
-            (body.status, body.patient_id, bed_id),
+            (DB_BED_STATUSES[body.status], body.patient_id, bed_id),
         )
         updated = cur.fetchone()
-
-        if not updated:
-            raise HTTPException(status_code=404, detail=f"Bed {bed_id} not found")
 
         # Fetch patient name for the socket payload
         patient_name = None
@@ -177,7 +224,7 @@ async def update_bed_status(bed_id: int, body: BedStatusUpdate):
         "bed_id": updated["id"],
         "ward_id": updated["ward_id"],
         "bed_number": updated["bed_number"],
-        "status": updated["status"],
+        "status": from_db_bed_status(updated["status"]),
         "assigned_patient_id": updated["assigned_patient_id"],
         "patient_name": patient_name,
     }
@@ -187,11 +234,23 @@ async def update_bed_status(bed_id: int, body: BedStatusUpdate):
     await emit_bed_update(
         ward_id=updated["ward_id"],
         bed_id=updated["id"],
-        new_status=updated["status"],
+        new_status=from_db_bed_status(updated["status"]),
         patient_name=patient_name,
     )
 
-    return updated
+    return success_response(
+        data={
+            "bed_id": updated["id"],
+            "ward_id": updated["ward_id"],
+            "bed_number": updated["bed_number"],
+            "previous_status": from_db_bed_status(existing["status"]),
+            "new_status": from_db_bed_status(updated["status"]),
+            "assigned_patient_id": updated["assigned_patient_id"],
+            "patient_name": patient_name,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        message="Bed status updated",
+    )
 
 
 # ── POST /api/beds/pre-allocate ─────────────────────────────────────────
@@ -203,6 +262,11 @@ async def pre_allocate_bed(body: PreAllocateRequest):
     reserve it for the given patient.
     """
     with get_db() as cur:
+        cur.execute("SELECT id, name FROM patients WHERE id = %s", (body.patient_id,))
+        patient = cur.fetchone()
+        if not patient:
+            raise HTTPException(status_code=404, detail=f"Patient {body.patient_id} not found")
+
         if body.ward_id:
             # Preferred ward
             cur.execute(
@@ -210,7 +274,7 @@ async def pre_allocate_bed(body: PreAllocateRequest):
                 SELECT b.id AS bed_id, b.bed_number, b.ward_id, w.name AS ward_name
                 FROM beds b
                 JOIN wards w ON w.id = b.ward_id
-                WHERE b.status = 'available' AND b.ward_id = %s
+                WHERE b.status = 'AVAILABLE' AND b.ward_id = %s
                 ORDER BY b.bed_number
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED;
@@ -224,7 +288,7 @@ async def pre_allocate_bed(body: PreAllocateRequest):
                 SELECT b.id AS bed_id, b.bed_number, b.ward_id, w.name AS ward_name
                 FROM beds b
                 JOIN wards w ON w.id = b.ward_id
-                WHERE b.status = 'available'
+                WHERE b.status = 'AVAILABLE'
                 ORDER BY
                     CASE WHEN LOWER(w.name) LIKE '%%icu%%' THEN 1 ELSE 0 END,
                     b.bed_number
@@ -235,13 +299,13 @@ async def pre_allocate_bed(body: PreAllocateRequest):
 
         bed = cur.fetchone()
         if not bed:
-            raise HTTPException(status_code=404, detail="No available bed found")
+            raise HTTPException(status_code=409, detail="No available bed found")
 
         # Reserve the bed
         cur.execute(
             """
             UPDATE beds
-            SET status = 'reserved', assigned_patient_id = %s
+            SET status = 'RESERVED', assigned_patient_id = %s
             WHERE id = %s
             RETURNING id, bed_number, ward_id;
             """,
@@ -250,9 +314,7 @@ async def pre_allocate_bed(body: PreAllocateRequest):
         reserved = cur.fetchone()
 
         # Fetch patient name
-        cur.execute("SELECT name FROM patients WHERE id = %s", (body.patient_id,))
-        patient_row = cur.fetchone()
-        patient_name = patient_row["name"] if patient_row else None
+        patient_name = patient["name"]
 
     # Update Redis
     redis_payload = {
@@ -273,12 +335,17 @@ async def pre_allocate_bed(body: PreAllocateRequest):
         patient_name=patient_name,
     )
 
-    return {
-        "bed_id": bed["bed_id"],
-        "bed_number": bed["bed_number"],
-        "ward_name": bed["ward_name"],
-        "ward_id": bed["ward_id"],
-    }
+    return success_response(
+        data={
+            "bed_id": bed["bed_id"],
+            "bed_number": bed["bed_number"],
+            "ward_name": bed["ward_name"],
+                "ward_id": bed["ward_id"],
+                "patient_id": body.patient_id,
+                "status": "reserved",
+        },
+        message="Bed pre-allocated successfully",
+    )
 
 
 # ── GET /api/beds/predict-vacancy ───────────────────────────────────────
@@ -290,7 +357,7 @@ async def predict_vacancy():
     current occupancy, day-of-week, hour, pending discharges, and a
     historical average discharge rate.
     """
-    MODEL_PATH = Path(__file__).resolve().parent.parent / "bed_predictor.pkl"
+    MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "bed_predictor.pkl"
 
     # Try loading the ML model; fall back to heuristic if missing
     model = None
@@ -315,9 +382,9 @@ async def predict_vacancy():
             SELECT
                 w.id                                        AS ward_id,
                 w.name                                      AS ward_name,
-                w.bed_count                                 AS total_beds,
-                COUNT(*) FILTER (WHERE b.status = 'available')   AS current_available,
-                COUNT(*) FILTER (WHERE b.status = 'occupied')    AS occupied_count
+                w.total_beds                                AS total_beds,
+                COUNT(*) FILTER (WHERE b.status = 'AVAILABLE')   AS current_available,
+                COUNT(*) FILTER (WHERE b.status = 'OCCUPIED')    AS occupied_count
             FROM wards w
             LEFT JOIN beds b ON b.ward_id = w.id
             GROUP BY w.id
@@ -331,7 +398,7 @@ async def predict_vacancy():
             """
             SELECT b.ward_id, COUNT(*) AS cnt
             FROM discharge_orders d
-            JOIN beds b ON b.assigned_patient_id = d.patient_id
+            JOIN beds b ON b.id = d.bed_id
             WHERE d.confirmed_at IS NULL
             GROUP BY b.ward_id;
             """
@@ -365,4 +432,7 @@ async def predict_vacancy():
             }
         )
 
-    return predictions
+    return success_response(
+        data=predictions,
+        message="Vacancy predictions retrieved",
+    )

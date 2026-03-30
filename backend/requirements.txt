@@ -13,6 +13,3 @@ pandas
 numpy
 alembic
 python-multipart
-redis
-joblib
-numpy

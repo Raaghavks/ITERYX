@@ -26,10 +26,10 @@ export default function Navbar() {
   };
 
   const links = [
-    { href: '/registration', label: 'OPD Registration', icon: HeartPulse },
-    { href: '/queue', label: 'Doctor Queue', icon: Stethoscope },
-    { href: '/beds', label: 'Bed Map', icon: BedDouble },
-    { href: '/admin', label: 'Admin Dashboard', icon: LayoutDashboard },
+    { href: "/opd/register", label: "OPD Registration", icon: HeartPulse },
+    { href: "/doctor/queue", label: "Doctor Queue", icon: Stethoscope },
+    { href: "/admin/beds", label: "Bed Map", icon: BedDouble },
+    { href: "/admin/dashboard", label: "Admin Dashboard", icon: LayoutDashboard },
   ];
 
   return (

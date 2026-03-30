@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List
 from pydantic import BaseModel
 import joblib
@@ -6,16 +6,28 @@ import os
 import pandas as pd
 from datetime import datetime, timezone
 
+from backend.api_contract import success_response
 from backend.database import get_db
 
 try:
-    from backend.sockets.events import sio
+    from backend.sockets.events import sio, emit_emergency_alert
 except ImportError:
     sio = None
+    emit_emergency_alert = None
 
 router = APIRouter(prefix="/api/triage", tags=["Triage"])
 router_patients = APIRouter(prefix="/api/patients", tags=["Patients"])
 router_queue = APIRouter(prefix="/api/queue", tags=["Queue"])
+
+DB_QUEUE_STATUS = {
+    "waiting": "WAITING",
+    "in_consultation": "IN_CONSULTATION",
+    "completed": "COMPLETED",
+}
+
+
+def from_db_queue_status(value: str) -> str:
+    return value.lower()
 
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRIAGE_MODEL_PATH = os.path.join(SCRIPT_DIR, "ml", "triage_model.pkl")
@@ -53,6 +65,7 @@ class PatientRegister(BaseModel):
 
 class ScoreRequest(BaseModel):
     patient_id: int
+    doctor_id: int | None = None
 
 class StatusUpdate(BaseModel):
     status: str
@@ -92,11 +105,11 @@ async def register_patient(data: PatientRegister):
                 (patient_id, sym.symptom_text, sym.severity_code)
             )
 
-    return {
-        "success": True, 
-        "data": {"patient_id": patient_id}, 
-        "message": "Patient registered successfully"
-    }
+    return success_response(
+        data={"patient_id": patient_id},
+        message="Patient registered successfully",
+        status_code=201,
+    )
 
 # 2. POST /api/triage/score
 @router.post("/score")
@@ -181,6 +194,8 @@ async def score_patient(data: ScoreRequest):
             score = 30.0
             priority_level = "LOW"
 
+    score = float(score)
+
     with get_db() as cur:
         # Calculate queue position
         cur.execute(
@@ -188,7 +203,7 @@ async def score_patient(data: ScoreRequest):
             SELECT COUNT(*) as count 
             FROM opd_queue o
             JOIN triage_scores t ON o.patient_id = t.patient_id
-            WHERE o.status = 'waiting' AND t.score > %s
+            WHERE o.status = 'WAITING' AND t.score > %s
             """,
             (score,)
         )
@@ -202,79 +217,106 @@ async def score_patient(data: ScoreRequest):
             INSERT INTO triage_scores (patient_id, score, priority_level, queue_position, computed_at)
             VALUES (%s, %s, %s, %s, %s);
             """,
-            (data.patient_id, float(score), priority_level, queue_position, datetime.now(timezone.utc))
+            (data.patient_id, score, priority_level, queue_position, datetime.now(timezone.utc))
         )
 
-        # Get an available doctor
-        cur.execute("SELECT id FROM doctors WHERE is_available = TRUE ORDER BY id ASC LIMIT 1")
-        doc = cur.fetchone()
-        if not doc:
-            # Fallback to general doctor or ID 1
-            cur.execute("SELECT id FROM doctors WHERE id = 1")
+        doctor_id = data.doctor_id
+        if doctor_id is not None:
+            cur.execute("SELECT id FROM doctors WHERE id = %s", (doctor_id,))
+            selected_doctor = cur.fetchone()
+            if not selected_doctor:
+                raise HTTPException(status_code=404, detail="Selected doctor not found")
+        else:
+            # Fall back to the first available doctor when none is selected by intake staff.
+            cur.execute("SELECT id FROM doctors WHERE is_available = TRUE ORDER BY id ASC LIMIT 1")
             doc = cur.fetchone()
             if not doc:
-                cur.execute(
-                    "INSERT INTO doctors (name, specialization, is_available) VALUES (%s, %s, TRUE) RETURNING id",
-                    ("Default Doctor", "General")
-                )
+                # Fallback to general doctor or ID 1
+                cur.execute("SELECT id FROM doctors WHERE id = 1")
                 doc = cur.fetchone()
-        
-        doctor_id = doc["id"]
+                if not doc:
+                    cur.execute(
+                        "INSERT INTO doctors (name, specialization, is_available) VALUES (%s, %s, TRUE) RETURNING id",
+                        ("Default Doctor", "General")
+                    )
+                    doc = cur.fetchone()
+
+            doctor_id = doc["id"]
 
         # Insert or update opd_queue
-        cur.execute("SELECT id FROM opd_queue WHERE patient_id = %s AND status != 'completed'", (data.patient_id,))
+        cur.execute("SELECT id FROM opd_queue WHERE patient_id = %s AND status != 'COMPLETED'", (data.patient_id,))
         q_ext = cur.fetchone()
         if q_ext:
             cur.execute(
                 """
                 UPDATE opd_queue 
-                SET queue_position = %s, status = 'waiting' 
+                SET doctor_id = %s, queue_position = %s, status = 'WAITING' 
                 WHERE id = %s
                 """,
-                (queue_position, q_ext["id"])
+                (doctor_id, queue_position, q_ext["id"])
             )
         else:
             cur.execute(
                 """
                 INSERT INTO opd_queue (patient_id, doctor_id, queue_position, status, created_at)
-                VALUES (%s, %s, %s, 'waiting', %s);
+                VALUES (%s, %s, %s, 'WAITING', %s);
                 """,
                 (data.patient_id, doctor_id, queue_position, datetime.now(timezone.utc))
             )
 
     if sio:
         await sio.emit("queue_update", {"event": "new_patient", "patient_id": data.patient_id})
+        if emit_emergency_alert and priority_level == "CRITICAL":
+            with get_db() as cur:
+                cur.execute("SELECT name FROM patients WHERE id = %s", (data.patient_id,))
+                patient_row = cur.fetchone()
+                patient_name = patient_row["name"] if patient_row else "Unknown Patient"
+            await emit_emergency_alert(patient_name, priority_level, score)
 
-    return {
-        "success": True,
-        "data": {
-            "score": float(score),
+    return success_response(
+        data={
+            "score": score,
             "priority_level": priority_level,
-            "queue_position": queue_position
+            "queue_position": queue_position,
+            "doctor_id": doctor_id,
         },
-        "message": "Triage score calculated and added to queue"
-    }
+        message="Triage score calculated and patient added to queue",
+    )
 
 # 3. GET /api/queue/opd
 @router_queue.get("/opd")
-async def get_opd_queue():
+async def get_opd_queue(status: str | None = Query(default=None)):
+    valid_statuses = {"waiting", "in_consultation", "completed"}
+    if status and status not in valid_statuses:
+        raise HTTPException(status_code=400, detail="Invalid status filter")
+
     with get_db() as cur:
-        cur.execute(
-            """
+        params = []
+        query = """
             SELECT 
+                o.id as queue_id,
+                o.doctor_id,
+                o.status,
                 p.id as patient_id, 
-                p.name, 
+                p.name,
+                p.gender,
                 p.age, 
+                d.name as doctor_name,
                 t.score, 
                 t.priority_level,
                 o.created_at as queued_at
             FROM opd_queue o
             JOIN patients p ON o.patient_id = p.id
             JOIN triage_scores t ON o.patient_id = t.patient_id
-            WHERE o.status = 'waiting'
-            ORDER BY t.score DESC;
-            """
-        )
+            LEFT JOIN doctors d ON o.doctor_id = d.id
+        """
+
+        if status:
+            query += " WHERE o.status = %s"
+            params.append(DB_QUEUE_STATUS[status])
+
+        query += " ORDER BY t.score DESC, o.created_at ASC;"
+        cur.execute(query, params)
         rows = cur.fetchall()
 
         queue_list = []
@@ -295,17 +337,26 @@ async def get_opd_queue():
             wait_time_mins = int((datetime.now(timezone.utc) - q_time).total_seconds() / 60)
 
             queue_list.append({
+                "id": row["queue_id"],
                 "patient_id": row["patient_id"],
                 "name": row["name"],
                 "age": row["age"],
+                "gender": row["gender"],
+                "doctor_id": row["doctor_id"],
+                "doctor_name": row["doctor_name"],
                 "chief_complaint": chief_complaint,
                 "score": round(row["score"], 2),
                 "priority_level": row["priority_level"],
                 "queue_position": idx + 1,
+                "status": from_db_queue_status(row["status"]),
+                "created_at": q_time.isoformat(),
                 "wait_time_mins": max(0, wait_time_mins)
             })
 
-    return queue_list
+    return success_response(
+        data=queue_list,
+        message="OPD queue retrieved",
+    )
 
 # 4. PATCH /api/queue/{queue_id}/status
 @router_queue.patch("/{queue_id}/status")
@@ -315,16 +366,26 @@ async def update_queue_status(queue_id: int, data: StatusUpdate):
         raise HTTPException(status_code=400, detail="Invalid status")
         
     with get_db() as cur:
-        cur.execute("SELECT id FROM opd_queue WHERE id = %s", (queue_id,))
-        if not cur.fetchone():
+        cur.execute("SELECT id, patient_id, status FROM opd_queue WHERE id = %s", (queue_id,))
+        existing = cur.fetchone()
+        if not existing:
             raise HTTPException(status_code=404, detail="Queue entry not found")
             
         cur.execute(
             "UPDATE opd_queue SET status = %s WHERE id = %s",
-            (data.status, queue_id)
+            (DB_QUEUE_STATUS[data.status], queue_id)
         )
         
     if sio:
         await sio.emit("queue_update", {"event": "status_change", "queue_id": queue_id, "status": data.status})
         
-    return {"success": True, "message": f"Status updated to {data.status}"}
+    return success_response(
+        data={
+            "queue_id": queue_id,
+            "patient_id": existing["patient_id"],
+            "previous_status": from_db_queue_status(existing["status"]),
+            "new_status": data.status,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        message=f"Queue status updated to {data.status}",
+    )

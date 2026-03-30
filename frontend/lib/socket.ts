@@ -1,46 +1,87 @@
-import { io, Socket } from 'socket.io-client';
+import { io, Socket } from "socket.io-client";
+import type {
+  BedStatusUpdateEvent,
+  DischargeOrderUpdateEvent,
+  EmergencyAlertPayload,
+  QueueUpdatePayload,
+} from "@/types";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:8000";
 
-class SocketService {
-  private static instance: SocketService;
-  public socket: Socket;
+let socket: Socket | null = null;
+const joinedWards = new Set<number>();
 
-  private constructor() {
-    this.socket = io(SOCKET_URL, {
+export function getSocket(): Socket {
+  if (!socket) {
+    socket = io(SOCKET_URL, {
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
       autoConnect: true,
-      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000,
+    });
+
+    socket.on("connect", () => {
+      console.log("WebSocket connected to:", SOCKET_URL);
+      joinedWards.forEach((wardId) => {
+        socket?.emit("join_ward", { ward_id: wardId });
+      });
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("WebSocket disconnected:", reason);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.warn("WebSocket connection error:", error.message);
     });
   }
-
-  public static getInstance(): SocketService {
-    if (!SocketService.instance) {
-      SocketService.instance = new SocketService();
-    }
-    return SocketService.instance;
-  }
-
-  // Typed listeners
-  public onQueueUpdate(callback: (data: unknown) => void) {
-    this.socket.on('queue_update', callback);
-  }
-
-  public onBedStatusUpdate(callback: (data: unknown) => void) {
-    this.socket.on('bed_status_update', callback);
-  }
-
-  public onEmergencyAlert(callback: (data: unknown) => void) {
-    this.socket.on('emergency_alert', callback);
-  }
-
-  public removeListener(event: string, callback?: (data: unknown) => void) {
-    if (callback) {
-      this.socket.off(event, callback);
-    } else {
-      this.socket.off(event);
-    }
-  }
+  return socket;
 }
 
-export const socketService = SocketService.getInstance();
-export const socket = socketService.socket;
+export function joinWard(wardId: number): void {
+  joinedWards.add(wardId);
+  const s = getSocket();
+  s.emit("join_ward", { ward_id: wardId });
+}
+
+export function leaveWard(wardId: number): void {
+  joinedWards.delete(wardId);
+  const s = getSocket();
+  s.emit("leave_ward", { ward_id: wardId });
+}
+
+export const socketService = {
+  getSocket,
+  joinWard,
+  leaveWard,
+  onEmergencyAlert: (callback: (data: EmergencyAlertPayload) => void) => {
+    getSocket().on("emergency_alert", callback);
+  },
+  onQueueUpdate: (callback: (data: QueueUpdatePayload) => void) => {
+    getSocket().on("queue_update", callback);
+  },
+  onBedStatusUpdate: (callback: (data: BedStatusUpdateEvent) => void) => {
+    getSocket().on("bed_status_update", callback);
+  },
+  onDischargeOrderUpdate: (callback: (data: DischargeOrderUpdateEvent) => void) => {
+    getSocket().on("discharge_order_update", callback);
+  },
+  removeListener: (
+    event: string,
+    callback?:
+      | ((data: EmergencyAlertPayload) => void)
+      | ((data: QueueUpdatePayload) => void)
+      | ((data: BedStatusUpdateEvent) => void)
+      | ((data: DischargeOrderUpdateEvent) => void)
+  ) => {
+    if (callback) {
+      getSocket().off(event, callback);
+    } else {
+      getSocket().off(event);
+    }
+  }
+};

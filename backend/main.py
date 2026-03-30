@@ -1,20 +1,26 @@
 import os
 from contextlib import asynccontextmanager
-from typing import Any
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 import redis.asyncio as redis
 from dotenv import load_dotenv
 
-from backend.database import Base, engine, get_async_db
+from backend.api_contract import (
+    http_exception_handler,
+    success_response,
+    validation_exception_handler,
+)
+from backend.database import Base, engine, get_async_db, get_db
 from backend.routes.admissions import router as admissions_router
 from backend.routes.beds import router as beds_router
 from backend.routes.triage import router as triage_router
 from backend.routes.triage import router_patients as patients_router
 from backend.routes.triage import router_queue as queue_router
+from backend.routes.dashboard import router as dashboard_router
 from backend.sockets.events import socket_app
 import backend.models
 
@@ -39,6 +45,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
 # CORS - allow all origins for development
 app.add_middleware(
     CORSMiddleware,
@@ -54,17 +63,31 @@ app.include_router(admissions_router)
 app.include_router(triage_router)
 app.include_router(patients_router)
 app.include_router(queue_router)
+app.include_router(dashboard_router)
+
+# Extra: Inline Doctor listing for registration
+@app.get("/api/doctors", tags=["Doctors"])
+async def get_all_doctors(db=Depends(get_async_db)):
+    with get_db() as cur:
+        cur.execute(
+            """
+            SELECT
+                id,
+                name,
+                specialization,
+                CASE WHEN is_available THEN 'available' ELSE 'busy' END AS status
+            FROM doctors
+            ORDER BY name ASC
+            """
+        )
+        rows = cur.fetchall()
+        return success_response(
+            data=[dict(r) for r in rows],
+            message="Doctors retrieved",
+        )
 
 # Mount Socket.IO
 app.mount("/socket.io", socket_app)
-
-# Helper for standardized responses
-def standard_response(success: bool, data: Any = None, message: str = ""):
-    return {
-        "success": success,
-        "data": data,
-        "message": message
-    }
 
 @app.get("/health")
 async def health_check(db: AsyncSession = Depends(get_async_db)):
@@ -81,12 +104,11 @@ async def health_check(db: AsyncSession = Depends(get_async_db)):
     except Exception:
         redis_status = "disconnected"
         
-    return standard_response(
-        success=(db_status == "connected" and redis_status == "connected"),
+    return success_response(
         data={"db": db_status, "redis": redis_status},
         message="System health status"
     )
 
 @app.get("/")
 async def root():
-    return standard_response(True, message="Welcome to the Hospital System API")
+    return success_response(message="Welcome to the Hospital System API")
