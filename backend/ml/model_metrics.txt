@@ -1,22 +1,22 @@
 ITERYX ML Training Summary
 
-Triage dataset source: synthetic
-Triage version: triage-20260330232104
-Triage rows: 5000
-Triage accuracy: 0.8150
-Triage macro precision: 0.7474
-Triage macro recall: 0.7111
-Triage macro F1: 0.7237
-Triage weighted F1: 0.8079
-Triage calibration ECE: 0.0740
-Triage Brier score: 0.2620
+Triage dataset source: real
+Triage version: triage-20260330235736
+Triage rows: 200228
+Triage accuracy: 0.9999
+Triage macro precision: 0.7500
+Triage macro recall: 0.7368
+Triage macro F1: 0.7432
+Triage weighted F1: 0.9999
+Triage calibration ECE: 0.0000
+Triage Brier score: 0.0001
 
-Bed dataset source: synthetic
-Bed version: beds-20260330232104
-Bed rows: 2000
-Bed RMSE: 1.5660
-Bed MAE: 1.2423
-Bed R2: 0.7806
+Bed dataset source: real
+Bed version: beds-20260330235736
+Bed rows: 913
+Bed RMSE: 594.9035
+Bed MAE: 329.7694
+Bed R2: 0.5095
 
 Ingestion report: C:\Users\vtroh\.gemini\antigravity\scratch\hospital-queue-system\backend\ml\artifacts\ingestion_report.json
 Benchmark report: C:\Users\vtroh\.gemini\antigravity\scratch\hospital-queue-system\backend\ml\artifacts\benchmark_report.json

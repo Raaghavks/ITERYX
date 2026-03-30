@@ -1,85 +1,85 @@
 {
   "triage": {
-    "latest_version": "triage-20260330232104",
+    "latest_version": "triage-20260330235736",
     "artifact_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\triage_model.pkl",
-    "updated_at": "2026-03-30T23:21:04.050795+00:00",
+    "updated_at": "2026-03-30T23:57:36.659128+00:00",
     "validation": {
-      "accuracy": 0.815,
-      "macro_avg_precision": 0.7473625315415984,
-      "macro_avg_recall": 0.7111293742135417,
-      "macro_avg_f1": 0.7237118136435244,
-      "weighted_avg_f1": 0.807936531700608,
-      "calibration_ece": 0.07399956160783767,
-      "brier_score": 0.26198315375936604,
+      "accuracy": 0.9999250861509265,
+      "macro_avg_precision": 0.7499736842105263,
+      "macro_avg_recall": 0.7368289466758637,
+      "macro_avg_f1": 0.7432235058817338,
+      "weighted_avg_f1": 0.9999247496868904,
+      "calibration_ece": 4.798120173017102e-05,
+      "brier_score": 0.00010151516183411206,
       "classification_report": {
         "CRITICAL": {
-          "precision": 0.8703427719821163,
-          "recall": 0.9082426127527217,
-          "f1-score": 0.8888888888888888,
-          "support": 643.0
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21027.0
         },
         "HIGH": {
-          "precision": 0.5739644970414202,
-          "recall": 0.5025906735751295,
-          "f1-score": 0.5359116022099447,
-          "support": 193.0
+          "precision": 1.0,
+          "recall": 0.9473684210526315,
+          "f1-score": 0.972972972972973,
+          "support": 19.0
         },
         "LOW": {
-          "precision": 0.888,
-          "recall": 0.9736842105263158,
-          "f1-score": 0.9288702928870293,
-          "support": 114.0
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 1.0
         },
         "MEDIUM": {
-          "precision": 0.6571428571428571,
-          "recall": 0.46,
-          "f1-score": 0.5411764705882353,
-          "support": 50.0
+          "precision": 0.9998947368421053,
+          "recall": 0.9999473656508238,
+          "f1-score": 0.999921050553962,
+          "support": 18999.0
         },
-        "accuracy": 0.815,
+        "accuracy": 0.9999250861509265,
         "macro avg": {
-          "precision": 0.7473625315415984,
-          "recall": 0.7111293742135417,
-          "f1-score": 0.7237118136435244,
-          "support": 1000.0
+          "precision": 0.7499736842105263,
+          "recall": 0.7368289466758637,
+          "f1-score": 0.7432235058817338,
+          "support": 40046.0
         },
         "weighted avg": {
-          "precision": 0.8044946931706378,
-          "recall": 0.815,
-          "f1-score": 0.807936531700608,
-          "support": 1000.0
+          "precision": 0.9999250887794825,
+          "recall": 0.9999250861509265,
+          "f1-score": 0.9999247496868904,
+          "support": 40046.0
         }
       }
     },
     "metadata": {
-      "dataset_source": "synthetic",
-      "row_count": 5000,
+      "dataset_source": "real",
+      "row_count": 200228,
       "class_distribution": {
-        "CRITICAL": 3216,
-        "HIGH": 966,
-        "LOW": 571,
-        "MEDIUM": 247
+        "CRITICAL": 105131,
+        "MEDIUM": 94995,
+        "HIGH": 95,
+        "LOW": 7
       },
       "feature_ranges": {
         "age": {
           "min": 18.0,
-          "max": 90.0
+          "max": 89.0
         },
         "bp_systolic": {
-          "min": 90.0,
-          "max": 180.0
+          "min": 70.0,
+          "max": 218.0
         },
         "spo2": {
-          "min": 80.0,
+          "min": 78.0,
           "max": 100.0
         },
         "temperature": {
-          "min": 96.0,
-          "max": 104.0
+          "min": 89.6,
+          "max": 212.54
         },
         "heart_rate": {
-          "min": 50.0,
-          "max": 140.0
+          "min": 43.0,
+          "max": 157.0
         },
         "symptom_severity_max": {
           "min": 1.0,
@@ -87,7 +87,7 @@
         },
         "symptom_count": {
           "min": 1.0,
-          "max": 5.0
+          "max": 3.0
         }
       },
       "classes": [
@@ -99,17 +99,17 @@
     }
   },
   "beds": {
-    "latest_version": "beds-20260330232104",
+    "latest_version": "beds-20260330235736",
     "artifact_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\bed_predictor.pkl",
-    "updated_at": "2026-03-30T23:21:04.486850+00:00",
+    "updated_at": "2026-03-30T23:57:36.848373+00:00",
     "validation": {
-      "rmse": 1.5660338115003314,
-      "mae": 1.2422747055425258,
-      "r2": 0.7806262068530436
+      "rmse": 594.9034786062418,
+      "mae": 329.76938298234296,
+      "r2": 0.5095156142483591
     },
     "metadata": {
-      "dataset_source": "synthetic",
-      "row_count": 2000,
+      "dataset_source": "real",
+      "row_count": 913,
       "feature_ranges": {
         "day_of_week": {
           "min": 0.0,
@@ -120,16 +120,16 @@
           "max": 23.0
         },
         "current_occupancy_rate": {
-          "min": 0.0,
-          "max": 1.0
+          "min": 0.3694029850746269,
+          "max": 0.8757199151257957
         },
         "pending_discharge_count": {
           "min": 0.0,
-          "max": 10.0
+          "max": 0.0
         },
         "historical_avg_discharge_rate": {
-          "min": 0.01,
-          "max": 5.0
+          "min": 24.01111111111112,
+          "max": 5388.533333333334
         }
       }
     }

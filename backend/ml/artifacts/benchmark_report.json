@@ -1,23 +1,23 @@
 {
   "triage": {
-    "dataset_source": "synthetic",
-    "version": "triage-20260330232104",
-    "row_count": 5000,
-    "accuracy": 0.815,
-    "macro_avg_precision": 0.7473625315415984,
-    "macro_avg_recall": 0.7111293742135417,
-    "macro_avg_f1": 0.7237118136435244,
-    "weighted_avg_f1": 0.807936531700608,
-    "calibration_ece": 0.07399956160783767,
-    "brier_score": 0.26198315375936604
+    "dataset_source": "real",
+    "version": "triage-20260330235736",
+    "row_count": 200228,
+    "accuracy": 0.9999250861509265,
+    "macro_avg_precision": 0.7499736842105263,
+    "macro_avg_recall": 0.7368289466758637,
+    "macro_avg_f1": 0.7432235058817338,
+    "weighted_avg_f1": 0.9999247496868904,
+    "calibration_ece": 4.798120173017102e-05,
+    "brier_score": 0.00010151516183411206
   },
   "beds": {
-    "dataset_source": "synthetic",
-    "version": "beds-20260330232104",
-    "row_count": 2000,
-    "rmse": 1.5660338115003314,
-    "mae": 1.2422747055425258,
-    "r2": 0.7806262068530436
+    "dataset_source": "real",
+    "version": "beds-20260330235736",
+    "row_count": 913,
+    "rmse": 594.9034786062418,
+    "mae": 329.76938298234296,
+    "r2": 0.5095156142483591
   },
   "ingestion_report_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\artifacts\\ingestion_report.json",
   "experiment_log_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\artifacts\\experiment_runs.jsonl",

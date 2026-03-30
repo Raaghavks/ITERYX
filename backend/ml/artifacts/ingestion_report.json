@@ -1,18 +1,23 @@
 {
   "triage": {
     "dataset_name": "triage",
-    "source_files": [],
-    "raw_rows": 0,
-    "processed_rows": 0,
-    "output_path": null,
-    "status": "missing"
+    "source_files": [
+      "triage_from_archive.csv",
+      "triage_from_mimic_demo.csv"
+    ],
+    "raw_rows": 200228,
+    "processed_rows": 200228,
+    "output_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\datasets\\processed\\triage_dataset.csv",
+    "status": "processed"
   },
   "beds": {
     "dataset_name": "beds",
-    "source_files": [],
-    "raw_rows": 0,
-    "processed_rows": 0,
-    "output_path": null,
-    "status": "missing"
+    "source_files": [
+      "beds_from_archive1.csv"
+    ],
+    "raw_rows": 913,
+    "processed_rows": 913,
+    "output_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\datasets\\processed\\bed_dataset.csv",
+    "status": "processed"
   }
 }
