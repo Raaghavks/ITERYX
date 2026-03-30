@@ -1,0 +1,54 @@
+{
+  "baseUrl": "http://localhost:8000/api",
+  "socketUrl": "http://localhost:8000",
+  "socketPath": "/socket.io",
+  "enums": {
+    "priorityLevels": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+    "bedStatuses": ["available", "occupied", "reserved", "maintenance"],
+    "queueStatuses": ["waiting", "in_consultation", "completed"],
+    "doctorStatuses": ["available", "busy"]
+  },
+  "httpRoutes": [
+    { "method": "POST", "path": "/api/patients/register" },
+    { "method": "POST", "path": "/api/triage/score" },
+    { "method": "GET", "path": "/api/doctors" },
+    { "method": "GET", "path": "/api/queue/opd" },
+    { "method": "PATCH", "path": "/api/queue/{queue_id}/status" },
+    { "method": "GET", "path": "/api/beds" },
+    { "method": "GET", "path": "/api/wards" },
+    { "method": "PATCH", "path": "/api/beds/{bed_id}/status" },
+    { "method": "POST", "path": "/api/beds/pre-allocate" },
+    { "method": "GET", "path": "/api/beds/predict-vacancy" },
+    { "method": "POST", "path": "/api/admissions" },
+    { "method": "POST", "path": "/api/discharge-orders" },
+    { "method": "GET", "path": "/api/discharge-orders/pending" },
+    { "method": "PATCH", "path": "/api/discharge-orders/{order_id}/confirm" },
+    { "method": "GET", "path": "/api/dashboard/kpis" },
+    { "method": "GET", "path": "/livez" },
+    { "method": "GET", "path": "/readyz" },
+    { "method": "GET", "path": "/metrics" },
+    { "method": "GET", "path": "/health" }
+  ],
+  "frontendMarkers": [
+    "\"/patients/register\"",
+    "\"/triage/score\"",
+    "\"/doctors\"",
+    "\"/queue/opd\"",
+    "`/queue/${queueId}/status`",
+    "\"/beds\"",
+    "\"/wards\"",
+    "`/beds/${bedId}/status`",
+    "\"/beds/pre-allocate\"",
+    "\"/beds/predict-vacancy\"",
+    "\"/admissions\"",
+    "\"/discharge-orders\"",
+    "`/discharge-orders/${orderId}/confirm`",
+    "\"/dashboard/kpis\""
+  ],
+  "socketEvents": [
+    "queue_update",
+    "bed_status_update",
+    "emergency_alert",
+    "discharge_order_update"
+  ]
+}

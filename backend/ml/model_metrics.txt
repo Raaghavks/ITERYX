@@ -1,40 +1,24 @@
-﻿============================================================
-  MODEL 1 - Triage Scoring (XGBoost Classifier)
-============================================================
+ITERYX ML Training Summary
 
-[DATA]  Generated 50000 synthetic patient rows
-    Class distribution:
-priority_level
-CRITICAL    32180
-HIGH         9624
-LOW          5424
-MEDIUM       2772
+Triage dataset source: synthetic
+Triage version: triage-20260330224708
+Triage rows: 5000
+Triage accuracy: 0.8150
+Triage macro precision: 0.7474
+Triage macro recall: 0.7111
+Triage macro F1: 0.7237
+Triage weighted F1: 0.8079
+Triage calibration ECE: 0.0740
+Triage Brier score: 0.2620
 
-[REPORT]  Classification Report:
-              precision    recall  f1-score   support
+Bed dataset source: synthetic
+Bed version: beds-20260330224709
+Bed rows: 2000
+Bed RMSE: 1.5660
+Bed MAE: 1.2423
+Bed R2: 0.7806
 
-    CRITICAL       0.86      0.95      0.90      6436
-        HIGH       0.66      0.37      0.48      1925
-         LOW       0.85      1.00      0.92      1085
-      MEDIUM       0.59      0.60      0.59       554
-
-    accuracy                           0.82     10000
-   macro avg       0.74      0.73      0.72     10000
-weighted avg       0.81      0.82      0.81     10000
-
-[OK]  triage_model.pkl saved -> C:\Users\raagh\.gemini\antigravity\scratch\ITERYX\backend\ml\triage_model.pkl
-
-============================================================
-  MODEL 2 - Bed Vacancy Prediction (GradientBoosting)
-============================================================
-
-[DATA]  Generated 20000 synthetic occupancy rows
-    Target range: 0 - 15
-
-[REPORT]  RMSE: 1.4490
-
-[OK]  bed_predictor.pkl saved -> C:\Users\raagh\.gemini\antigravity\scratch\ITERYX\backend\ml\bed_predictor.pkl
-
-------------------------------------------------------------
-[OK] triage_model.pkl saved | [OK] bed_predictor.pkl saved
-------------------------------------------------------------
+Ingestion report: C:\Users\raagh\.gemini\antigravity\scratch\ITERYX\backend\ml\artifacts\ingestion_report.json
+Benchmark report: C:\Users\raagh\.gemini\antigravity\scratch\ITERYX\backend\ml\artifacts\benchmark_report.json
+Experiment log: C:\Users\raagh\.gemini\antigravity\scratch\ITERYX\backend\ml\artifacts\experiment_runs.jsonl
+Model registry: C:\Users\raagh\.gemini\antigravity\scratch\ITERYX\backend\ml\artifacts\model_registry.json

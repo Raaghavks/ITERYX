@@ -1,9 +1,37 @@
-from socketio import AsyncServer, ASGIApp
 import logging
+from typing import Any, Awaitable, Callable
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from socketio import ASGIApp, AsyncServer
+except ModuleNotFoundError:
+    class AsyncServer:  # type: ignore[override]
+        def __init__(self, *args, **kwargs):
+            self.handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
+
+        def on(self, event: str):
+            def decorator(func: Callable[..., Awaitable[Any]]):
+                self.handlers[event] = func
+                return func
+
+            return decorator
+
+        async def emit(self, *args, **kwargs) -> None:
+            return None
+
+        def enter_room(self, *args, **kwargs) -> None:
+            return None
+
+    class ASGIApp:  # type: ignore[override]
+        def __init__(self, server: AsyncServer):
+            self.server = server
+
+        async def __call__(self, scope, receive, send):
+            return None
+
 
 # Initialize Socket.IO AsyncServer
 sio = AsyncServer(async_mode='asgi', cors_allowed_origins='*')

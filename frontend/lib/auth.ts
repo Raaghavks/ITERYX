@@ -10,7 +10,12 @@ import type { AuthRole, AuthSessionUser } from "@/types/auth";
 export const SESSION_COOKIE_NAME = "iteryx_session";
 
 const SESSION_DURATION_SECONDS = 60 * 60 * 12;
-const AUTH_SECRET = process.env.AUTH_SESSION_SECRET || "iteryx-dev-auth-secret";
+const DEFAULT_AUTH_SECRET = "iteryx-dev-auth-secret";
+const AUTH_SECRET = process.env.AUTH_SESSION_SECRET || DEFAULT_AUTH_SECRET;
+
+if (process.env.NODE_ENV === "production" && AUTH_SECRET === DEFAULT_AUTH_SECRET) {
+  throw new Error("AUTH_SESSION_SECRET must be set to a strong value in production.");
+}
 
 function signValue(payload: string): string {
   return createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   createAdmission,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/api";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { getSocket } from "@/lib/socket";
+import { PILOT_OPERATIONAL_RULES } from "@/lib/pilot-rules";
 import type { PreallocateResult, Priority, QueueEntry, Ward } from "@/types";
 import {
   BedDouble,
@@ -186,6 +188,21 @@ export default function DoctorQueuePage() {
             Refresh Queue
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-[28px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-900 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="font-bold">Pilot operations note</p>
+          <p className="mt-1 text-amber-800">
+            {PILOT_OPERATIONAL_RULES[0]} {PILOT_OPERATIONAL_RULES[2]}
+          </p>
+        </div>
+        <Link
+          href="/admin/pilot"
+          className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 font-semibold text-amber-900 transition hover:bg-amber-100"
+        >
+          View full pilot rules
+        </Link>
       </div>
 
       {notice && (

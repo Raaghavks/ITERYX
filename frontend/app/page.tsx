@@ -140,6 +140,23 @@ export default function Home() {
                 </div>
               </div>
             </Link>
+
+            <Link href="/admin/pilot" className="group p-2 bg-slate-50 rounded-[32px] border border-slate-100 hover:border-indigo-200 transition-all duration-500">
+              <div className="bg-white rounded-[24px] p-8 space-y-6 shadow-sm border border-slate-100 group-hover:shadow-xl transition-all">
+                <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                  <ShieldCheck className="w-8 h-8 text-rose-500" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-800">Pilot Readiness</h3>
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                    Guided stakeholder demo flow, operational guardrails, and live go/no-go readiness checks.
+                  </p>
+                </div>
+                <div className="flex items-center text-slate-400 font-bold text-xs uppercase tracking-widest gap-2 group-hover:text-indigo-600 transition-colors">
+                  Launch Pilot View <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+            </Link>
           </div>
           
           <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 border-t border-slate-50">

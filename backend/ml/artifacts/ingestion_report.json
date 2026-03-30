@@ -1,0 +1,18 @@
+{
+  "triage": {
+    "dataset_name": "triage",
+    "source_files": [],
+    "raw_rows": 0,
+    "processed_rows": 0,
+    "output_path": null,
+    "status": "missing"
+  },
+  "beds": {
+    "dataset_name": "beds",
+    "source_files": [],
+    "raw_rows": 0,
+    "processed_rows": 0,
+    "output_path": null,
+    "status": "missing"
+  }
+}

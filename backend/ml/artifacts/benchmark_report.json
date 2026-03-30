@@ -1,0 +1,25 @@
+{
+  "triage": {
+    "dataset_source": "synthetic",
+    "version": "triage-20260330224708",
+    "row_count": 5000,
+    "accuracy": 0.815,
+    "macro_avg_precision": 0.7473625315415984,
+    "macro_avg_recall": 0.7111293742135417,
+    "macro_avg_f1": 0.7237118136435244,
+    "weighted_avg_f1": 0.807936531700608,
+    "calibration_ece": 0.07399956160783767,
+    "brier_score": 0.26198315375936604
+  },
+  "beds": {
+    "dataset_source": "synthetic",
+    "version": "beds-20260330224709",
+    "row_count": 2000,
+    "rmse": 1.5660338115003314,
+    "mae": 1.2422747055425258,
+    "r2": 0.7806262068530436
+  },
+  "ingestion_report_path": "C:\\Users\\raagh\\.gemini\\antigravity\\scratch\\ITERYX\\backend\\ml\\artifacts\\ingestion_report.json",
+  "experiment_log_path": "C:\\Users\\raagh\\.gemini\\antigravity\\scratch\\ITERYX\\backend\\ml\\artifacts\\experiment_runs.jsonl",
+  "model_registry_path": "C:\\Users\\raagh\\.gemini\\antigravity\\scratch\\ITERYX\\backend\\ml\\artifacts\\model_registry.json"
+}

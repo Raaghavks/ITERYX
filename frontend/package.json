@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:smoke": "node --experimental-transform-types tests/api.smoke.test.ts",
+    "check:contract": "node scripts/check-contract.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.7.0",

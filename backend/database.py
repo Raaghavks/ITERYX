@@ -1,13 +1,12 @@
 """Shared database and Redis helpers for both sync routes and async ORM usage."""
 
 import json
+import importlib.util
 import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
-import psycopg2
-import psycopg2.extras
 import redis.asyncio as aioredis
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -24,6 +23,15 @@ REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 def get_db_connection():
     """Return a new psycopg2 connection with RealDictCursor as default."""
+    try:
+        import psycopg2
+        import psycopg2.extras
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "psycopg2 is required for synchronous database access. "
+            "Install backend dependencies before running database-backed routes."
+        ) from exc
+
     return psycopg2.connect(
         DATABASE_URL,
         cursor_factory=psycopg2.extras.RealDictCursor,
@@ -46,14 +54,18 @@ ASYNC_DATABASE_URL = DATABASE_URL
 if ASYNC_DATABASE_URL.startswith("postgresql://"):
     ASYNC_DATABASE_URL = ASYNC_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-engine = create_async_engine(ASYNC_DATABASE_URL, echo=True)
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
+if importlib.util.find_spec("asyncpg") is not None:
+    engine = create_async_engine(ASYNC_DATABASE_URL, echo=True)
+    AsyncSessionLocal = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+else:
+    engine = None
+    AsyncSessionLocal = None
 
 
 class Base(DeclarativeBase):
@@ -62,6 +74,11 @@ class Base(DeclarativeBase):
 
 async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency that yields an async SQLAlchemy session."""
+    if AsyncSessionLocal is None:
+        raise RuntimeError(
+            "asyncpg is required for async database access. "
+            "Install backend dependencies before using async DB features."
+        )
     async with AsyncSessionLocal() as session:
         try:
             yield session

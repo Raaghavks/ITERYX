@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   Area,
@@ -284,6 +285,21 @@ export default function AdminDashboardPage() {
       )}
 
       <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-sky-100 bg-sky-50 px-5 py-4 text-sm text-sky-800 shadow-sm">
+          <div>
+            <p className="font-bold">Pilot workflow is ready to brief stakeholders.</p>
+            <p className="mt-1 text-sky-700">
+              Use the pilot page for the guided demo order, operational rules, and go/no-go checks.
+            </p>
+          </div>
+          <Link
+            href="/admin/pilot"
+            className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 font-semibold text-white transition hover:bg-sky-700"
+          >
+            Open Pilot Readiness
+          </Link>
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div
             className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.24em] ${

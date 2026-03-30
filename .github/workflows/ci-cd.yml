@@ -1,0 +1,53 @@
+name: CI-CD
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run backend tests
+        run: python -m unittest backend.tests.test_workflows backend.tests.test_ml_pipeline backend.tests.test_ml_runtime -v
+      - name: Verify backend contract
+        run: python backend/verify_contract.py
+
+  frontend-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run frontend smoke tests
+        run: npm run test:smoke
+      - name: Verify frontend contract
+        run: npm run check:contract
+      - name: Build frontend
+        run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-checks, frontend-checks]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build ./backend -t iteryx-backend:ci
+      - name: Build frontend image
+        run: docker build ./frontend -t iteryx-frontend:ci

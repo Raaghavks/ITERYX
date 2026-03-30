@@ -21,6 +21,8 @@ from typing import Optional
 
 from backend.api_contract import success_response
 from backend.database import get_db, set_redis_json
+from backend.ml.model_store import load_model_artifact
+from backend.ml.runtime import choose_bed_prediction
 from backend.sockets.events import emit_bed_update
 
 logger = logging.getLogger(__name__)
@@ -360,11 +362,10 @@ async def predict_vacancy():
     MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "bed_predictor.pkl"
 
     # Try loading the ML model; fall back to heuristic if missing
-    model = None
+    artifact = None
     try:
-        import joblib
         if MODEL_PATH.exists():
-            model = joblib.load(MODEL_PATH)
+            artifact = load_model_artifact(MODEL_PATH)
     except ImportError:
         logger.warning("joblib not installed — using heuristic prediction")
     except Exception as exc:
@@ -412,23 +413,27 @@ async def predict_vacancy():
         current_occupancy_rate = round(occupied / total, 4)
         pending_discharge_count = pending_map.get(w["ward_id"], 0)
 
-        if model is not None:
-            import numpy as np
-            features = np.array(
-                [[day_of_week, hour_of_day, current_occupancy_rate,
-                  pending_discharge_count, historical_avg_discharge_rate]]
-            )
-            predicted_free = max(0, int(model.predict(features)[0]))
-        else:
-            # Simple heuristic: current available + expected discharges
-            predicted_free = w["current_available"] + pending_discharge_count
+        decision = choose_bed_prediction(
+            artifact=artifact,
+            features={
+                "day_of_week": float(day_of_week),
+                "hour_of_day": float(hour_of_day),
+                "current_occupancy_rate": float(current_occupancy_rate),
+                "pending_discharge_count": float(pending_discharge_count),
+                "historical_avg_discharge_rate": float(historical_avg_discharge_rate),
+            },
+            current_available=int(w["current_available"]),
+        )
 
         predictions.append(
             {
                 "ward_id": w["ward_id"],
                 "ward_name": w["ward_name"],
-                "predicted_free_beds": predicted_free,
+                "predicted_free_beds": decision["predicted_free_beds"],
                 "current_available": w["current_available"],
+                "prediction_source": decision["prediction_source"],
+                "model_version": decision["model_version"],
+                "fallback_reason": decision["fallback_reason"],
             }
         )
 

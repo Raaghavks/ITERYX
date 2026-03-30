@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   Activity,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/api";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { getSocket, joinWard } from "@/lib/socket";
+import { PILOT_OPERATIONAL_RULES } from "@/lib/pilot-rules";
 import type { Bed, BedStatus, Ward, WardPrediction } from "@/types";
 
 const STATUS_STYLES: Record<
@@ -257,6 +259,21 @@ export default function BedsPage() {
             Refresh now
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-[28px] border border-cyan-100 bg-cyan-50 px-5 py-4 text-sm text-cyan-900 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="font-bold">Pilot bed-allocation guardrail</p>
+          <p className="mt-1 text-cyan-800">
+            {PILOT_OPERATIONAL_RULES[1]} {PILOT_OPERATIONAL_RULES[3]}
+          </p>
+        </div>
+        <Link
+          href="/admin/pilot"
+          className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 font-semibold text-cyan-900 transition hover:bg-cyan-100"
+        >
+          Open pilot checklist
+        </Link>
       </div>
 
       {isFallbackPolling && (

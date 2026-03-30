@@ -428,16 +428,35 @@ Response data:
 
 ### GET /health
 
-Returns DB and Redis health state.
+Returns DB/Redis state plus lightweight monitoring counters.
 
 Response data:
 
 ```json
 {
   "db": "connected",
-  "redis": "connected"
+  "redis": "connected",
+  "app_env": "development",
+  "monitoring": {
+    "uptime_seconds": 120,
+    "total_requests": 34,
+    "error_requests": 0,
+    "last_request_at": "2026-03-31T12:15:00+00:00"
+  }
 }
 ```
+
+### GET /livez
+
+Returns a simple liveness probe for container/orchestrator checks.
+
+### GET /readyz
+
+Returns readiness state for database and Redis dependencies.
+
+### GET /metrics
+
+Returns plain-text Prometheus-style counters for uptime and request volume.
 
 ## Socket Events
 

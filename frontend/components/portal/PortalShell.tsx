@@ -35,6 +35,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, roles: ["administrator"] },
+  { label: "Pilot Readiness", href: "/admin/pilot", icon: MonitorSmartphone, roles: ["administrator"] },
   { label: "Patients", href: "/opd/register", icon: Users, roles: ["administrator", "receptionist"] },
   { label: "Bed Allocation", href: "/admin/beds", icon: BedDouble, roles: ["administrator", "doctor"] },
   { label: "Staff", icon: Stethoscope, roles: ["administrator"], disabled: true },
@@ -44,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const PAGE_TITLES: Array<{ match: string; label: string; kicker: string }> = [
   { match: "/admin/dashboard", label: "Hospital Dashboard", kicker: "Live Overview" },
+  { match: "/admin/pilot", label: "Pilot Readiness", kicker: "Stakeholder Demo Control" },
   { match: "/admin/beds", label: "Bed Allocation", kicker: "Operational Bed Control" },
   { match: "/doctor/queue", label: "Doctor Queue", kicker: "Clinical Triage Flow" },
   { match: "/opd/register", label: "Patient Intake", kicker: "Registration & Triage" },

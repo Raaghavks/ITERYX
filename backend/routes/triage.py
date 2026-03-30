@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List
 from pydantic import BaseModel
-import joblib
 import os
-import pandas as pd
 from datetime import datetime, timezone
 
 from backend.api_contract import success_response
 from backend.database import get_db
+from backend.ml.model_store import load_model_artifact
+from backend.ml.runtime import choose_triage_decision
 
 try:
     from backend.sockets.events import sio, emit_emergency_alert
@@ -33,10 +33,7 @@ SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRIAGE_MODEL_PATH = os.path.join(SCRIPT_DIR, "ml", "triage_model.pkl")
 
 try:
-    triage_model_data = joblib.load(TRIAGE_MODEL_PATH)
-    xgb_model = triage_model_data["model"]
-    label_encoder = triage_model_data["label_encoder"]
-    model_features = triage_model_data["features"]
+    triage_model_data = load_model_artifact(TRIAGE_MODEL_PATH)
 except Exception as e:
     print(f"Warning: Could not load triage model: {e}")
     triage_model_data = None
@@ -138,63 +135,14 @@ async def score_patient(data: ScoreRequest):
     if not vitals or not symptoms:
         raise HTTPException(status_code=400, detail="Vitals or symptoms missing for patient")
 
-    critical_symptoms = ["chest pain", "breathing difficulty", "asthma attack", "unconscious", "seizure"]
-    is_critical_override = False
-    
-    if vitals["spo2"] < 90 or vitals["heart_rate"] > 120:
-        is_critical_override = True
-        
-    for sym in symptoms:
-        if sym["symptom_text"].lower() in critical_symptoms:
-            is_critical_override = True
-            break
-            
-    score = 0.0
-    priority_level = "LOW"
-    
-    if is_critical_override:
-        priority_level = "CRITICAL"
-        score = 95.0
-    else:
-        if triage_model_data:
-            symptom_severity_max = max((s["severity_code"] for s in symptoms), default=1)
-            symptom_count = len(symptoms)
-            
-            input_df = pd.DataFrame([{
-                "age": patient["age"],
-                "bp_systolic": vitals["bp_systolic"],
-                "spo2": vitals["spo2"],
-                "temperature": vitals["temperature"],
-                "heart_rate": vitals["heart_rate"],
-                "symptom_severity_max": symptom_severity_max,
-                "symptom_count": symptom_count
-            }])
-            
-            input_df = input_df[model_features]
-            preds = xgb_model.predict(input_df)
-            probas = xgb_model.predict_proba(input_df)[0]
-            
-            predicted_class = label_encoder.inverse_transform(preds)[0]
-            priority_level = predicted_class
-            
-            classes = list(label_encoder.classes_)
-            def get_prob(cls_name):
-                if cls_name in classes:
-                    return probas[classes.index(cls_name)]
-                return 0.0
-                
-            score = (
-                get_prob("CRITICAL") * 90 + 
-                get_prob("HIGH") * 70 + 
-                get_prob("MEDIUM") * 50 + 
-                get_prob("LOW") * 20
-            )
-            score = min(score, 94.0)
-        else:
-            score = 30.0
-            priority_level = "LOW"
-
-    score = float(score)
+    decision = choose_triage_decision(
+        artifact=triage_model_data,
+        patient_age=patient["age"],
+        vitals=vitals,
+        symptoms=symptoms,
+    )
+    score = float(decision["score"])
+    priority_level = decision["priority_level"]
 
     with get_db() as cur:
         # Calculate queue position
@@ -279,6 +227,10 @@ async def score_patient(data: ScoreRequest):
             "priority_level": priority_level,
             "queue_position": queue_position,
             "doctor_id": doctor_id,
+            "decision_source": decision["decision_source"],
+            "model_version": decision["model_version"],
+            "confidence": decision["confidence"],
+            "fallback_reason": decision["fallback_reason"],
         },
         message="Triage score calculated and patient added to queue",
     )

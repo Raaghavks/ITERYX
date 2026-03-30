@@ -4,22 +4,34 @@ services:
   postgres:
     image: postgres:15
     container_name: iteryx-db
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: hospital_db
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: ${POSTGRES_DB:-hospital_db}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-hospital_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - iteryx-network
 
   redis:
     image: redis:7-alpine
     container_name: iteryx-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - iteryx-network
 
@@ -27,17 +39,23 @@ services:
     build:
       context: ./backend
     container_name: iteryx-backend
+    restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://admin:admin123@postgres:5432/hospital_db
-      - REDIS_URL=redis://redis:6379
-      - PORT=8000
+      - APP_ENV=${APP_ENV:-development}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://admin:admin123@postgres:5432/hospital_db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PORT=${PORT:-8000}
     depends_on:
-      - postgres
-      - redis
-    volumes:
-      - ./backend:/app/backend
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - iteryx-network
 
@@ -48,13 +66,18 @@ services:
         - NEXT_PUBLIC_API_URL=http://localhost:8000/api
         - NEXT_PUBLIC_SOCKET_URL=http://localhost:8000
     container_name: iteryx-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
-      - NEXT_PUBLIC_SOCKET_URL=http://localhost:8000
+      - AUTH_SESSION_SECRET=${AUTH_SESSION_SECRET:-iteryx-dev-auth-secret}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-http://localhost:8000}
     depends_on:
-      - backend
+      backend:
+        condition: service_started
     networks:
       - iteryx-network
 
