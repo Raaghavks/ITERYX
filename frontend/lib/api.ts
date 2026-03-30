@@ -1,3 +1,5 @@
+import { QueueItem, WardPrediction, PreallocateResult, RegisterPatientResult, TriageScoreResult } from '@/types/index';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 async function fetchWrapper<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -18,13 +20,13 @@ async function fetchWrapper<T>(endpoint: string, options?: RequestInit): Promise
 
 export const api = {
   registerPatient: (data: unknown) => 
-    fetchWrapper('/patients/register', { method: 'POST', body: JSON.stringify(data) }),
+    fetchWrapper<RegisterPatientResult>('/patients/register', { method: 'POST', body: JSON.stringify(data) }),
     
   getTriageScore: (patient_id: string) => 
-    fetchWrapper('/triage/score', { method: 'POST', body: JSON.stringify({ patient_id }) }),
+    fetchWrapper<TriageScoreResult>('/triage/score', { method: 'POST', body: JSON.stringify({ patient_id }) }),
     
   getOPDQueue: () => 
-    fetchWrapper('/queue/opd', { method: 'GET' }),
+    fetchWrapper<QueueItem[]>('/queue/opd', { method: 'GET' }),
     
   updateQueueStatus: (id: string, status: string) => 
     fetchWrapper(`/queue/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
@@ -36,10 +38,10 @@ export const api = {
     fetchWrapper('/wards', { method: 'GET' }),
     
   preallocateBed: (data: unknown) => 
-    fetchWrapper('/beds/pre-allocate', { method: 'POST', body: JSON.stringify(data) }),
+    fetchWrapper<PreallocateResult>('/beds/pre-allocate', { method: 'POST', body: JSON.stringify(data) }),
     
   predictVacancy: () => 
-    fetchWrapper('/beds/predict-vacancy', { method: 'GET' }),
+    fetchWrapper<WardPrediction[]>('/beds/predict-vacancy', { method: 'GET' }),
     
   createAdmission: (data: unknown) => 
     fetchWrapper('/admissions', { method: 'POST', body: JSON.stringify(data) }),

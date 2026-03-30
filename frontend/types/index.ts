@@ -74,3 +74,52 @@ export interface Admission {
   admittedAt: string;
   status: 'ADMITTED' | 'DISCHARGED';
 }
+
+// Additional interfaces for queue management
+export interface QueueItem {
+  patient_id: number;
+  name: string;
+  age: number;
+  chief_complaint: string;
+  score: number;
+  priority_level: PriorityLevel;
+  queue_position: number;
+  wait_time_mins: number;
+}
+
+export interface WardPrediction {
+  ward_id: number;
+  ward_name: string;
+  predicted_free_beds: number;
+  current_available: number;
+}
+
+export interface QueueStats {
+  totalWaiting: number;
+  critical: number;
+  highPriority: number;
+  avgWait: number;
+}
+
+export interface PreallocateResult {
+  bed_id: number;
+  bed_number: number;
+  ward_name: string;
+  ward_id: number;
+}
+
+export interface RegisterPatientResult {
+  success: boolean;
+  data: { patient_id: number };
+  message: string;
+}
+
+export interface TriageScoreResult {
+  success: boolean;
+  data: {
+    score: number;
+    priority_level: PriorityLevel;
+    queue_position: number;
+  };
+  message: string;
+}
