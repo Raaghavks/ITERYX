@@ -1,7 +1,7 @@
 {
   "triage": {
     "dataset_source": "synthetic",
-    "version": "triage-20260330224708",
+    "version": "triage-20260330232104",
     "row_count": 5000,
     "accuracy": 0.815,
     "macro_avg_precision": 0.7473625315415984,
@@ -13,13 +13,13 @@
   },
   "beds": {
     "dataset_source": "synthetic",
-    "version": "beds-20260330224709",
+    "version": "beds-20260330232104",
     "row_count": 2000,
     "rmse": 1.5660338115003314,
     "mae": 1.2422747055425258,
     "r2": 0.7806262068530436
   },
-  "ingestion_report_path": "C:\\Users\\raagh\\.gemini\\antigravity\\scratch\\ITERYX\\backend\\ml\\artifacts\\ingestion_report.json",
-  "experiment_log_path": "C:\\Users\\raagh\\.gemini\\antigravity\\scratch\\ITERYX\\backend\\ml\\artifacts\\experiment_runs.jsonl",
-  "model_registry_path": "C:\\Users\\raagh\\.gemini\\antigravity\\scratch\\ITERYX\\backend\\ml\\artifacts\\model_registry.json"
+  "ingestion_report_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\artifacts\\ingestion_report.json",
+  "experiment_log_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\artifacts\\experiment_runs.jsonl",
+  "model_registry_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\artifacts\\model_registry.json"
 }

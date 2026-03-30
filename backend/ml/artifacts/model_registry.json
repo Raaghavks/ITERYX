@@ -1,8 +1,8 @@
 {
   "triage": {
-    "latest_version": "triage-20260330224708",
-    "artifact_path": "C:\\Users\\raagh\\.gemini\\antigravity\\scratch\\ITERYX\\backend\\ml\\triage_model.pkl",
-    "updated_at": "2026-03-30T22:47:08.299980+00:00",
+    "latest_version": "triage-20260330232104",
+    "artifact_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\triage_model.pkl",
+    "updated_at": "2026-03-30T23:21:04.050795+00:00",
     "validation": {
       "accuracy": 0.815,
       "macro_avg_precision": 0.7473625315415984,
@@ -99,9 +99,9 @@
     }
   },
   "beds": {
-    "latest_version": "beds-20260330224709",
-    "artifact_path": "C:\\Users\\raagh\\.gemini\\antigravity\\scratch\\ITERYX\\backend\\ml\\bed_predictor.pkl",
-    "updated_at": "2026-03-30T22:47:09.033287+00:00",
+    "latest_version": "beds-20260330232104",
+    "artifact_path": "C:\\Users\\vtroh\\.gemini\\antigravity\\scratch\\hospital-queue-system\\backend\\ml\\bed_predictor.pkl",
+    "updated_at": "2026-03-30T23:21:04.486850+00:00",
     "validation": {
       "rmse": 1.5660338115003314,
       "mae": 1.2422747055425258,
