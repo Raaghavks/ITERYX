@@ -9,9 +9,10 @@ from datetime import datetime, timezone
 from backend.database import get_db
 
 try:
-    from backend.sockets.events import sio
+    from backend.sockets.events import sio, emit_emergency_alert
 except ImportError:
     sio = None
+    emit_emergency_alert = None
 
 router = APIRouter(prefix="/api/triage", tags=["Triage"])
 router_patients = APIRouter(prefix="/api/patients", tags=["Patients"])
@@ -244,6 +245,12 @@ async def score_patient(data: ScoreRequest):
 
     if sio:
         await sio.emit("queue_update", {"event": "new_patient", "patient_id": data.patient_id})
+        if emit_emergency_alert and priority_level == "CRITICAL":
+            # Get patient name for emergency alert
+            cur.execute("SELECT name FROM patients WHERE id = %s", (data.patient_id,))
+            patient_row = cur.fetchone()
+            patient_name = patient_row["name"] if patient_row else "Unknown Patient"
+            await emit_emergency_alert(patient_name, priority_level, float(score))
 
     return {
         "success": True,
