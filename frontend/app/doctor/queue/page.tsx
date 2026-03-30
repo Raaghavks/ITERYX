@@ -133,10 +133,10 @@ export default function DoctorQueuePage() {
     });
 
     socketService.onEmergencyAlert((data: unknown) => {
-      const emergencyData = data as { name: string; score: number };
+      const emergencyData = data as { patient_name: string; score: number };
       setEmergencyBanner({
         show: true,
-        message: `🚨 CRITICAL PATIENT: ${emergencyData.name} — Score: ${emergencyData.score} — Moved to top`,
+        message: `🚨 CRITICAL PATIENT: ${emergencyData.patient_name} — Score: ${emergencyData.score} — Moved to top`,
       });
       setTimeout(() => setEmergencyBanner({ show: false, message: '' }), 5000);
     });
