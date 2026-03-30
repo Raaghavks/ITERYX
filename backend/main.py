@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 from backend.database import Base, engine, get_async_db
 from backend.routes.admissions import router as admissions_router
 from backend.routes.beds import router as beds_router
+from backend.routes.triage import router as triage_router
+from backend.routes.triage import router_patients as patients_router
+from backend.routes.triage import router_queue as queue_router
 from backend.sockets.events import socket_app
 import backend.models
 
@@ -48,6 +51,9 @@ app.add_middleware(
 # Register route modules
 app.include_router(beds_router)
 app.include_router(admissions_router)
+app.include_router(triage_router)
+app.include_router(patients_router)
+app.include_router(queue_router)
 
 # Mount Socket.IO
 app.mount("/socket.io", socket_app)
