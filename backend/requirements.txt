@@ -4,3 +4,6 @@ psycopg2-binary
 python-dotenv
 python-socketio
 python-multipart
+redis
+joblib
+numpy
