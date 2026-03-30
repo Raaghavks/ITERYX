@@ -23,6 +23,8 @@ jobs:
 
   frontend-checks:
     runs-on: ubuntu-latest
+    env:
+      AUTH_SESSION_SECRET: ci-auth-session-secret-please-rotate
     defaults:
       run:
         working-directory: frontend

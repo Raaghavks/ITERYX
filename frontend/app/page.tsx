@@ -3,7 +3,6 @@ import {
   Activity,
   BedDouble,
   ChevronRight,
-  Clock,
   HeartPulse,
   LayoutDashboard,
   ShieldCheck,
