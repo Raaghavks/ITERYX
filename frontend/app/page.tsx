@@ -1,74 +1,91 @@
 import Link from "next/link";
-import { 
-  Activity, 
-  LayoutDashboard, 
-  Stethoscope, 
-  UserPlus, 
-  BedDouble, 
-  Clock, 
-  ShieldCheck,
+import {
+  Activity,
+  BedDouble,
   ChevronRight,
-  TrendingUp,
+  Clock,
   HeartPulse,
-  Users
+  LayoutDashboard,
+  ShieldCheck,
+  Stethoscope,
+  UserPlus,
+  Users,
 } from "lucide-react";
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-slate-50 selection:bg-indigo-100 selection:text-indigo-700">
-      {/* ── Hero Section ── */}
-      <section className="pt-24 pb-20 px-8 max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <section className="mx-auto max-w-7xl px-8 pb-20 pt-24">
+        <div className="grid items-center gap-12 lg:grid-cols-2">
           <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 rounded-full border border-indigo-100">
-              <ShieldCheck className="w-4 h-4 text-indigo-500" />
-              <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Enterprise Healthcare Management</span>
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1">
+              <ShieldCheck className="h-4 w-4 text-indigo-500" />
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+                Enterprise Healthcare Management
+              </span>
             </div>
-            <h1 className="text-5xl md:text-7xl font-black text-slate-800 leading-[1.1] tracking-tight">
+
+            <h1 className="text-5xl font-black leading-[1.05] tracking-tight text-slate-800 md:text-7xl">
               Hospital management, <span className="text-indigo-600">reimagined</span> for speed.
             </h1>
-            <p className="text-lg text-slate-500 max-w-lg font-medium leading-relaxed">
-              ITERYX provides real-time visibility into bed map availability, AI-powered triage scoring, and prioritized doctor queues.
+
+            <p className="max-w-lg text-lg font-medium leading-relaxed text-slate-500">
+              ITERYX gives care teams a single workspace for real-time bed visibility,
+              AI-assisted triage, doctor queue management, and discharge coordination.
             </p>
-            <div className="flex flex-wrap gap-4 pt-4">
-              <a 
-                href="#portal" 
-                className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center gap-3 transition shadow-xl shadow-indigo-100"
+
+            <div className="flex flex-wrap items-center gap-4 pt-2">
+              <Link
+                href="/login"
+                className="flex items-center gap-3 rounded-2xl bg-indigo-600 px-8 py-4 font-bold text-white shadow-xl shadow-indigo-100 transition hover:bg-indigo-700"
               >
-                Access Portal <ChevronRight className="w-5 h-5" />
-              </a>
-              <div className="flex -space-x-3 items-center">
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200" />
+                Access Portal <ChevronRight className="h-5 w-5" />
+              </Link>
+
+              <div className="flex items-center -space-x-3">
+                {[1, 2, 3, 4].map((item) => (
+                  <div
+                    key={item}
+                    className="h-10 w-10 rounded-full border-2 border-white bg-slate-200"
+                  />
                 ))}
-                <span className="pl-6 text-sm font-bold text-slate-400">+12 Staff Online</span>
+                <span className="pl-6 text-sm font-bold text-slate-400">
+                  +12 staff online
+                </span>
               </div>
             </div>
           </div>
-          
-          <div className="relative group">
-            <div className="absolute inset-0 bg-indigo-500/10 blur-3xl rounded-full group-hover:bg-indigo-500/20 transition-all duration-700" />
-            <div className="relative bg-white rounded-[40px] border border-slate-100 p-8 shadow-2xl space-y-6">
-              <div className="flex justify-between items-end">
+
+          <div className="group relative">
+            <div className="absolute inset-0 rounded-full bg-indigo-500/10 blur-3xl transition-all duration-700 group-hover:bg-indigo-500/20" />
+            <div className="relative space-y-6 rounded-[40px] border border-slate-100 bg-white p-8 shadow-2xl">
+              <div className="flex items-end justify-between">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Global Occupancy</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                    Global Occupancy
+                  </p>
                   <p className="text-4xl font-black text-slate-800">84%</p>
                 </div>
-                <div className="h-12 w-24 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-emerald-500" />
+                <div className="flex h-12 w-24 items-center justify-center rounded-xl bg-emerald-50">
+                  <Activity className="h-6 w-6 text-emerald-500" />
                 </div>
               </div>
+
               <div className="space-y-4">
-                <div className="h-4 bg-slate-50 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-500 w-[84%] rounded-full shadow-lg shadow-indigo-200" />
+                <div className="h-4 overflow-hidden rounded-full bg-slate-50">
+                  <div className="h-full w-[84%] rounded-full bg-indigo-500 shadow-lg shadow-indigo-200" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-3xl space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Available Beds</p>
+                  <div className="space-y-1 rounded-3xl bg-slate-50 p-4">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">
+                      Available Beds
+                    </p>
                     <p className="text-xl font-bold text-slate-700">12</p>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-3xl space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Critical Queue</p>
+                  <div className="space-y-1 rounded-3xl bg-slate-50 p-4">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">
+                      Critical Queue
+                    </p>
                     <p className="text-xl font-bold text-rose-500">2</p>
                   </div>
                 </div>
@@ -78,12 +95,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── System Access Portal ── */}
-      <section id="portal" className="py-20 bg-white border-y border-slate-100">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-3xl font-black text-slate-800 tracking-tight">System Modules</h2>
-            <p className="text-slate-500 font-medium">Select a department to continue to the specific portal</p>
+      <section id="portal" className="border-y border-slate-100 bg-white py-20">
+        <div className="mx-auto max-w-7xl px-8">
+          <div className="mb-16 space-y-4 text-center">
+            <h2 className="text-3xl font-black tracking-tight text-slate-800">
+              System Modules
+            </h2>
+            <p className="font-medium text-slate-500">
+              Each hospital role gets a focused workspace with the right tools.
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -104,7 +124,6 @@ export default function Home() {
                 </div>
               </div>
             </Link>
-
             {/* Doctor Portal */}
             <Link href="/doctor/queue" className="group p-2 bg-slate-50 rounded-[32px] border border-slate-100 hover:border-indigo-200 transition-all duration-500">
               <div className="bg-white rounded-[24px] p-8 space-y-6 shadow-sm border border-slate-100 group-hover:shadow-xl transition-all">
@@ -158,42 +177,48 @@ export default function Home() {
               </div>
             </Link>
           </div>
-          
-          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 border-t border-slate-50">
-            <Link href="/admin/beds" className="flex items-center gap-4 group">
-              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 transition-all">
-                <BedDouble className="w-5 h-5 text-slate-600 group-hover:text-white transition-colors" />
+
+          <div className="mt-12 grid grid-cols-2 gap-8 border-t border-slate-50 pt-12 md:grid-cols-4">
+            <Link href="/login" className="group flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 transition-all group-hover:bg-indigo-600">
+                <BedDouble className="h-5 w-5 text-slate-600 transition-colors group-hover:text-white" />
               </div>
-              <span className="text-sm font-bold text-slate-600 group-hover:text-indigo-600 transition-colors">Bed Map</span>
+              <span className="text-sm font-bold text-slate-600 transition-colors group-hover:text-indigo-600">
+                Bed Map
+              </span>
             </Link>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                <Clock className="w-5 h-5 text-slate-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
+                <HeartPulse className="h-5 w-5 text-slate-600" />
               </div>
-              <span className="text-sm font-bold text-slate-600">Pending Discharge</span>
+              <span className="text-sm font-bold text-slate-600">Discharge Planning</span>
             </div>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                <Users className="w-5 h-5 text-slate-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
+                <Users className="h-5 w-5 text-slate-600" />
               </div>
-              <span className="text-sm font-bold text-slate-600">Staff Management</span>
+              <span className="text-sm font-bold text-slate-600">Staff Coordination</span>
             </div>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                <HeartPulse className="w-5 h-5 text-slate-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
+                <Activity className="h-5 w-5 text-slate-600" />
               </div>
-              <span className="text-sm font-bold text-slate-600">Health Alerts</span>
+              <span className="text-sm font-bold text-slate-600">Live Alerts</span>
             </div>
           </div>
         </div>
       </section>
 
-      <footer className="py-12 px-8 text-center bg-slate-50">
-        <div className="flex items-center justify-center gap-2 mb-4 opacity-50">
-          <Activity className="w-4 h-4 text-indigo-600" />
-          <span className="text-xs font-black tracking-widest uppercase">ITERYX HOSPITAL SYSTEMS</span>
+      <footer className="bg-slate-50 px-8 py-12 text-center">
+        <div className="mb-4 flex items-center justify-center gap-2 opacity-50">
+          <Activity className="h-4 w-4 text-indigo-600" />
+          <span className="text-xs font-black uppercase tracking-widest">
+            ITERYX Hospital Systems
+          </span>
         </div>
-        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">© 2026 ITERYX Healthcare Services • AI Prioritization Enabled</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+          © 2026 ITERYX Healthcare Services · AI prioritization enabled
+        </p>
       </footer>
     </main>
   );

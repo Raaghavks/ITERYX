@@ -71,9 +71,11 @@ export default function AdminDashboardPage() {
   const [processingDischargeId, setProcessingDischargeId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     try {
+      setLoadError(null);
       const [kpiData, wards, beds, discharges] = await Promise.all([
         getDashboardKPIs(),
         getAllWards(),
@@ -95,6 +97,9 @@ export default function AdminDashboardPage() {
       );
     } catch (error) {
       console.error("Dashboard load error:", error);
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load dashboard data."
+      );
     }
   }, []);
 
@@ -281,6 +286,12 @@ export default function AdminDashboardPage() {
       {actionError && (
         <div className="rounded-3xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 shadow-sm">
           {actionError}
+        </div>
+      )}
+
+      {loadError && (
+        <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 shadow-sm">
+          {loadError}
         </div>
       )}
 
