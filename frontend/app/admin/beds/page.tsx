@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllWards, getAllBeds, updateBedStatus } from "@/lib/api";
+import { getAllWards, getAllBeds, getWardPredictions, updateBedStatus } from "@/lib/api";
 import { getSocket, joinWard } from "@/lib/socket";
-import type { Ward, Bed, BedStatus } from "@/types";
+import type { Ward, Bed, BedStatus, WardPrediction } from "@/types";
 import { X, User, Clock, Stethoscope, BedDouble, Activity } from "lucide-react";
 import Link from "next/link";
 
@@ -17,6 +17,7 @@ const STATUS_COLORS: Record<BedStatus, { card: string; label: string }> = {
 export default function BedsPage() {
   const [wards, setWards] = useState<Ward[]>([]);
   const [beds, setBeds] = useState<Bed[]>([]);
+  const [predictions, setPredictions] = useState<WardPrediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Bed | null>(null);
   const [newStatus, setNewStatus] = useState<BedStatus>("available");
@@ -25,9 +26,10 @@ export default function BedsPage() {
 
   useEffect(() => {
     async function load() {
-      const [w, b] = await Promise.all([getAllWards(), getAllBeds()]);
+      const [w, b, p] = await Promise.all([getAllWards(), getAllBeds(), getWardPredictions()]);
       setWards(w);
       setBeds(b);
+      setPredictions(p);
       setLoading(false);
       // Join all ward rooms for real-time updates
       w.forEach((ward) => joinWard(ward.id));
@@ -41,6 +43,7 @@ export default function BedsPage() {
     const handler = ({ bed_id, new_status }: { bed_id: number; new_status: BedStatus; ward_id: number }) => {
       setBeds((prev) => prev.map((b) => b.id === bed_id ? { ...b, status: new_status } : b));
       setSelected((prev) => prev && prev.id === bed_id ? { ...prev, status: new_status } : prev);
+      getWardPredictions().then(setPredictions).catch(() => {});
     };
     socket.on("bed_status_update", handler);
     return () => { socket.off("bed_status_update", handler); };
@@ -52,17 +55,22 @@ export default function BedsPage() {
     return { total: wb.length, occupied: wb.filter((b) => b.status === "occupied").length };
   };
 
-  async function handleUpdateStatus() {
+  async function handleUpdateStatus(overrideStatus?: BedStatus, overridePatientId?: number) {
     if (!selected) return;
     setUpdating(true);
     try {
+      const statusToApply = overrideStatus ?? newStatus;
+      const patientId =
+        overridePatientId ??
+        (statusToApply === "reserved" && reserveId ? parseInt(reserveId) : undefined);
+
       await updateBedStatus(
         selected.id,
-        newStatus,
-        newStatus === "reserved" && reserveId ? parseInt(reserveId) : undefined
+        statusToApply,
+        patientId
       );
       // Optimistic update; socket will confirm
-      setBeds((prev) => prev.map((b) => b.id === selected.id ? { ...b, status: newStatus } : b));
+      setBeds((prev) => prev.map((b) => b.id === selected.id ? { ...b, status: statusToApply } : b));
       setSelected(null);
     } finally {
       setUpdating(false);
@@ -162,10 +170,9 @@ export default function BedsPage() {
             {wards.map((ward) => {
               const { total, occupied } = wardOccupancy(ward.id);
               const pct = total > 0 ? Math.round((occupied / total) * 100) : 0;
-              const available = beds.filter((b) => b.ward_id === ward.id && b.status === "available").length;
-              const reserved = beds.filter((b) => b.ward_id === ward.id && b.status === "reserved").length;
-              // Rough prediction: available + ~half of reserved could free up
-              const expectedFree = Math.max(available + Math.floor(reserved * 0.5), 0);
+              const prediction = predictions.find((item) => item.ward_id === ward.id);
+              const expectedFree = prediction?.predicted_free_beds ?? 0;
+              const currentAvailable = prediction?.current_available ?? beds.filter((b) => b.ward_id === ward.id && b.status === "available").length;
 
               return (
                 <div key={ward.id}>
@@ -182,7 +189,10 @@ export default function BedsPage() {
                     />
                   </div>
                   <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg inline-block">
-                    ~{expectedFree} beds expected free in 2 hrs
+                    {expectedFree} beds predicted free soon
+                  </p>
+                  <p className="mt-2 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                    {currentAvailable} currently available
                   </p>
                 </div>
               );
@@ -265,7 +275,7 @@ export default function BedsPage() {
                       className="flex-1 bg-white border border-emerald-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 text-slate-800"
                     />
                     <button
-                      onClick={() => { setNewStatus("reserved"); handleUpdateStatus(); }}
+                      onClick={() => handleUpdateStatus("reserved", parseInt(reserveId))}
                       disabled={!reserveId || updating}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50"
                     >

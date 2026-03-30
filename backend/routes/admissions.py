@@ -152,11 +152,11 @@ async def create_discharge_order(body: DischargeOrderCreate):
 
         cur.execute(
             """
-            INSERT INTO discharge_orders (patient_id, doctor_id, expected_discharge_at)
-            VALUES (%s, %s, %s)
-            RETURNING id, patient_id, doctor_id, expected_discharge_at, confirmed_at;
+            INSERT INTO discharge_orders (patient_id, bed_id, doctor_id, expected_discharge_at)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, patient_id, bed_id, doctor_id, expected_discharge_at, confirmed_at;
             """,
-            (body.patient_id, body.doctor_id, expected_dt),
+            (body.patient_id, body.bed_id, body.doctor_id, expected_dt),
         )
         order = cur.fetchone()
 

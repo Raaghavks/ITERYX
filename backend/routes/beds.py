@@ -290,7 +290,7 @@ async def predict_vacancy():
     current occupancy, day-of-week, hour, pending discharges, and a
     historical average discharge rate.
     """
-    MODEL_PATH = Path(__file__).resolve().parent.parent / "bed_predictor.pkl"
+    MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "bed_predictor.pkl"
 
     # Try loading the ML model; fall back to heuristic if missing
     model = None

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import redis.asyncio as redis
 from dotenv import load_dotenv
 
-from backend.database import Base, engine, get_async_db
+from backend.database import Base, engine, get_async_db, get_db
 from backend.routes.admissions import router as admissions_router
 from backend.routes.beds import router as beds_router
 from backend.routes.triage import router as triage_router
@@ -61,7 +61,17 @@ app.include_router(dashboard_router)
 @app.get("/api/doctors", tags=["Doctors"])
 async def get_all_doctors(db=Depends(get_async_db)):
     with get_db() as cur:
-        cur.execute("SELECT id, name, specialization, is_available as status FROM doctors")
+        cur.execute(
+            """
+            SELECT
+                id,
+                name,
+                specialization,
+                CASE WHEN is_available THEN 'available' ELSE 'busy' END AS status
+            FROM doctors
+            ORDER BY name ASC
+            """
+        )
         rows = cur.fetchall()
         return [dict(r) for r in rows]
 

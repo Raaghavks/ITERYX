@@ -148,7 +148,7 @@ export interface QueueStats {
 
 export interface PreallocateResult {
   bed_id: number;
-  bed_number: number;
+  bed_number: string;
   ward_name: string;
   ward_id: number;
 }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List
 from pydantic import BaseModel
 import joblib
@@ -246,10 +246,10 @@ async def score_patient(data: ScoreRequest):
     if sio:
         await sio.emit("queue_update", {"event": "new_patient", "patient_id": data.patient_id})
         if emit_emergency_alert and priority_level == "CRITICAL":
-            # Get patient name for emergency alert
-            cur.execute("SELECT name FROM patients WHERE id = %s", (data.patient_id,))
-            patient_row = cur.fetchone()
-            patient_name = patient_row["name"] if patient_row else "Unknown Patient"
+            with get_db() as cur:
+                cur.execute("SELECT name FROM patients WHERE id = %s", (data.patient_id,))
+                patient_row = cur.fetchone()
+                patient_name = patient_row["name"] if patient_row else "Unknown Patient"
             await emit_emergency_alert(patient_name, priority_level, float(score))
 
     return {
@@ -264,24 +264,38 @@ async def score_patient(data: ScoreRequest):
 
 # 3. GET /api/queue/opd
 @router_queue.get("/opd")
-async def get_opd_queue():
+async def get_opd_queue(status: str | None = Query(default=None)):
+    valid_statuses = {"waiting", "in_consultation", "completed"}
+    if status and status not in valid_statuses:
+        raise HTTPException(status_code=400, detail="Invalid status filter")
+
     with get_db() as cur:
-        cur.execute(
-            """
+        params = []
+        query = """
             SELECT 
+                o.id as queue_id,
+                o.doctor_id,
+                o.status,
                 p.id as patient_id, 
-                p.name, 
+                p.name,
+                p.gender,
                 p.age, 
+                d.name as doctor_name,
                 t.score, 
                 t.priority_level,
                 o.created_at as queued_at
             FROM opd_queue o
             JOIN patients p ON o.patient_id = p.id
             JOIN triage_scores t ON o.patient_id = t.patient_id
-            WHERE o.status = 'waiting'
-            ORDER BY t.score DESC;
-            """
-        )
+            LEFT JOIN doctors d ON o.doctor_id = d.id
+        """
+
+        if status:
+            query += " WHERE o.status = %s"
+            params.append(status)
+
+        query += " ORDER BY t.score DESC, o.created_at ASC;"
+        cur.execute(query, params)
         rows = cur.fetchall()
 
         queue_list = []
@@ -302,13 +316,19 @@ async def get_opd_queue():
             wait_time_mins = int((datetime.now(timezone.utc) - q_time).total_seconds() / 60)
 
             queue_list.append({
+                "id": row["queue_id"],
                 "patient_id": row["patient_id"],
                 "name": row["name"],
                 "age": row["age"],
+                "gender": row["gender"],
+                "doctor_id": row["doctor_id"],
+                "doctor_name": row["doctor_name"],
                 "chief_complaint": chief_complaint,
                 "score": round(row["score"], 2),
                 "priority_level": row["priority_level"],
                 "queue_position": idx + 1,
+                "status": row["status"],
+                "created_at": q_time.isoformat(),
                 "wait_time_mins": max(0, wait_time_mins)
             })
 
