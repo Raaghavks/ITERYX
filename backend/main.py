@@ -1,14 +1,42 @@
-from fastapi import FastAPI
+import os
+from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+import redis.asyncio as redis
+from dotenv import load_dotenv
 
-from backend.sockets.events import socket_app
-from backend.routes.beds import router as beds_router
+from backend.database import Base, engine, get_async_db
 from backend.routes.admissions import router as admissions_router
+from backend.routes.beds import router as beds_router
+from backend.sockets.events import socket_app
+import backend.models
 
-app = FastAPI(title="Hospital System API")
+load_dotenv()
 
-# CORS — allow all origins for development
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Create tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    # Startup: Initialize Redis
+    app.state.redis = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True)
+    
+    yield
+    
+    # Shutdown: Close Redis
+    await app.state.redis.close()
+
+app = FastAPI(
+    title="Hospital System API",
+    lifespan=lifespan
+)
+
+# CORS - allow all origins for development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,14 +49,38 @@ app.add_middleware(
 app.include_router(beds_router)
 app.include_router(admissions_router)
 
-# Mount Socket.IO application
+# Mount Socket.IO
 app.mount("/socket.io", socket_app)
 
+# Helper for standardized responses
+def standard_response(success: bool, data: Any = None, message: str = ""):
+    return {
+        "success": success,
+        "data": data,
+        "message": message
+    }
+
+@app.get("/health")
+async def health_check(db: AsyncSession = Depends(get_async_db)):
+    db_status = "connected"
+    redis_status = "connected"
+    
+    try:
+        await db.execute(text("SELECT 1"))
+    except Exception:
+        db_status = "disconnected"
+        
+    try:
+        await app.state.redis.ping()
+    except Exception:
+        redis_status = "disconnected"
+        
+    return standard_response(
+        success=(db_status == "connected" and redis_status == "connected"),
+        data={"db": db_status, "redis": redis_status},
+        message="System health status"
+    )
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the Hospital System API"}
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    return standard_response(True, message="Welcome to the Hospital System API")

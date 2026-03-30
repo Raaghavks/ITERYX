@@ -1,8 +1,17 @@
 fastapi
 uvicorn
+sqlalchemy
+asyncpg
 psycopg2-binary
 python-dotenv
+redis
 python-socketio
+joblib
+scikit-learn
+xgboost
+pandas
+numpy
+alembic
 python-multipart
 redis
 joblib
