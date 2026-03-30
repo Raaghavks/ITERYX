@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getAllWards, getAllBeds, getWardPredictions, updateBedStatus } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import {
+  createDischargeOrder,
+  getAllWards,
+  getAllBeds,
+  getWardPredictions,
+  updateBedStatus,
+} from "@/lib/api";
 import { getSocket, joinWard } from "@/lib/socket";
-import type { Ward, Bed, BedStatus, WardPrediction } from "@/types";
+import type { BedStatusUpdateEvent, Ward, Bed, BedStatus, WardPrediction } from "@/types";
 import { X, User, Clock, Stethoscope, BedDouble, Activity } from "lucide-react";
 import Link from "next/link";
 
@@ -23,31 +29,44 @@ export default function BedsPage() {
   const [newStatus, setNewStatus] = useState<BedStatus>("available");
   const [reserveId, setReserveId] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [dischargeAt, setDischargeAt] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  function defaultDischargeTime() {
+    const value = new Date(Date.now() + 2 * 60 * 60 * 1000);
+    value.setSeconds(0, 0);
+    const offsetMs = value.getTimezoneOffset() * 60_000;
+    return new Date(value.getTime() - offsetMs).toISOString().slice(0, 16);
+  }
+
+  const loadData = useCallback(async () => {
+    const [w, b, p] = await Promise.all([getAllWards(), getAllBeds(), getWardPredictions()]);
+    setWards(w);
+    setBeds(b);
+    setPredictions(p);
+    setLoading(false);
+    w.forEach((ward) => joinWard(ward.id));
+  }, []);
 
   useEffect(() => {
-    async function load() {
-      const [w, b, p] = await Promise.all([getAllWards(), getAllBeds(), getWardPredictions()]);
-      setWards(w);
-      setBeds(b);
-      setPredictions(p);
+    loadData().catch((error) => {
+      console.error("Failed to load bed map", error);
       setLoading(false);
-      // Join all ward rooms for real-time updates
-      w.forEach((ward) => joinWard(ward.id));
-    }
-    load();
-  }, []);
+    });
+  }, [loadData]);
 
   // Socket real-time: surgical update without re-fetch
   useEffect(() => {
     const socket = getSocket();
-    const handler = ({ bed_id, new_status }: { bed_id: number; new_status: BedStatus; ward_id: number }) => {
-      setBeds((prev) => prev.map((b) => b.id === bed_id ? { ...b, status: new_status } : b));
-      setSelected((prev) => prev && prev.id === bed_id ? { ...prev, status: new_status } : prev);
-      getWardPredictions().then(setPredictions).catch(() => {});
+    const handler = ({ bed_id }: BedStatusUpdateEvent) => {
+      if (bed_id) {
+        loadData().catch(() => {});
+      }
     };
     socket.on("bed_status_update", handler);
     return () => { socket.off("bed_status_update", handler); };
-  }, []);
+  }, [loadData]);
 
   // Recompute ward occupancy from local bed state
   const wardOccupancy = (wardId: number) => {
@@ -58,6 +77,7 @@ export default function BedsPage() {
   async function handleUpdateStatus(overrideStatus?: BedStatus, overridePatientId?: number) {
     if (!selected) return;
     setUpdating(true);
+    setActionError(null);
     try {
       const statusToApply = overrideStatus ?? newStatus;
       const patientId =
@@ -71,7 +91,34 @@ export default function BedsPage() {
       );
       // Optimistic update; socket will confirm
       setBeds((prev) => prev.map((b) => b.id === selected.id ? { ...b, status: statusToApply } : b));
+      setNotice(`${selected.number} updated to ${statusToApply}.`);
       setSelected(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not update bed status.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleCreateDischargeOrder() {
+    if (!selected?.assigned_patient_id || !selected.doctor_id || !dischargeAt) {
+      setActionError("Patient, doctor, and expected discharge time are required.");
+      return;
+    }
+
+    setUpdating(true);
+    setActionError(null);
+    try {
+      await createDischargeOrder(
+        selected.assigned_patient_id,
+        selected.id,
+        selected.doctor_id,
+        new Date(dischargeAt).toISOString()
+      );
+      setNotice(`Discharge scheduled for ${selected.patient_name ?? "the patient"} in ${selected.number}.`);
+      setSelected(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not create discharge order.");
     } finally {
       setUpdating(false);
     }
@@ -100,6 +147,12 @@ export default function BedsPage() {
         </div>
         <Link href="/" className="text-sm text-slate-400 hover:text-slate-600 transition">← Home</Link>
       </header>
+
+      {notice && (
+        <div className="fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm">
+          {notice}
+        </div>
+      )}
 
       <div className="flex h-[calc(100vh-65px)]">
         {/* Left — Bed Grid (70%) */}
@@ -136,7 +189,13 @@ export default function BedsPage() {
                   {wardBeds.map((bed) => (
                     <button
                       key={bed.id}
-                      onClick={() => { setSelected(bed); setNewStatus(bed.status); setReserveId(""); }}
+                      onClick={() => {
+                        setSelected(bed);
+                        setNewStatus(bed.status);
+                        setReserveId("");
+                        setDischargeAt(defaultDischargeTime());
+                        setActionError(null);
+                      }}
                       title={`${bed.number} — ${bed.status}`}
                       className={`
                         aspect-square rounded-xl border-b-4 flex flex-col items-center justify-center p-1.5
@@ -259,6 +318,25 @@ export default function BedsPage() {
                       </div>
                     </div>
                   )}
+
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-amber-800">
+                      Schedule Discharge
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={dischargeAt}
+                      onChange={(event) => setDischargeAt(event.target.value)}
+                      className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <button
+                      onClick={handleCreateDischargeOrder}
+                      disabled={updating || !selected.assigned_patient_id || !selected.doctor_id || !dischargeAt}
+                      className="mt-3 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      {updating ? "Scheduling..." : "Create Discharge Order"}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -299,13 +377,19 @@ export default function BedsPage() {
                   <option value="maintenance">Maintenance</option>
                 </select>
                 <button
-                  onClick={handleUpdateStatus}
+                  onClick={() => void handleUpdateStatus()}
                   disabled={updating || newStatus === selected.status}
                   className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-2xl text-sm transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg"
                 >
                   {updating ? "Updating..." : "Update Bed Status"}
                 </button>
               </div>
+
+              {actionError && (
+                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                  {actionError}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from backend.api_contract import success_response
 from backend.database import get_db
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
@@ -18,11 +19,11 @@ async def get_dashboard_kpis():
         total_patients = cur.fetchone()["count"]
 
         # 2. Current Queue Length
-        cur.execute("SELECT COUNT(*) as count FROM opd_queue WHERE status = 'waiting'")
+        cur.execute("SELECT COUNT(*) as count FROM opd_queue WHERE status = 'WAITING'")
         queue_length = cur.fetchone()["count"]
 
         # 3. Overall Bed Occupancy
-        cur.execute("SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'occupied') as occupied FROM beds")
+        cur.execute("SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'OCCUPIED') as occupied FROM beds")
         bed_stats = cur.fetchone()
         total_beds = bed_stats["total"] or 1
         occupied_beds = bed_stats["occupied"] or 0
@@ -32,9 +33,12 @@ async def get_dashboard_kpis():
         cur.execute("SELECT COUNT(*) as count FROM triage_scores WHERE priority_level = 'CRITICAL'")
         critical_patients = cur.fetchone()["count"]
 
-    return {
-        "totalPatientsToday": total_patients,
-        "currentQueueLength": queue_length,
-        "overallBedOccupancy": occupancy_rate,
-        "criticalPatients": critical_patients
-    }
+    return success_response(
+        data={
+            "totalPatientsToday": total_patients,
+            "currentQueueLength": queue_length,
+            "overallBedOccupancy": occupancy_rate,
+            "criticalPatients": critical_patients,
+        },
+        message="Dashboard KPIs retrieved",
+    )

@@ -26,6 +26,7 @@ export interface Bed {
   patient_initials?: string;
   admitted_since?: string;
   assigned_doctor?: string;
+  doctor_id?: number | null;
 }
 
 export interface Patient {
@@ -101,10 +102,14 @@ export interface DashboardKPIs {
 
 export interface DischargeOrder {
   id: number;
+  patient_id: number;
+  bed_id: number | null;
+  doctor_id: number;
   patient_name: string;
   ward_name: string;
   bed_number: string;
   expected_discharge_at: string;
+  confirmed_at?: string | null;
 }
 
 export interface EmergencyAlert {
@@ -113,6 +118,39 @@ export interface EmergencyAlert {
   timestamp: string;
   score: number;
   priority: Priority;
+}
+
+export interface EmergencyAlertPayload {
+  patient_name: string;
+  timestamp: string;
+  score: number;
+  priority: Priority;
+}
+
+export interface QueueUpdatePayload {
+  totalPatientsToday?: number;
+  currentQueueLength?: number;
+  criticalPatients?: number;
+}
+
+export interface BedStatusUpdateEvent {
+  bed_id: number;
+  new_status: BedStatus;
+  ward_id: number;
+}
+
+export interface DischargeOrderUpdateEvent {
+  event: "created" | "confirmed";
+  order_id: number;
+  patient_id: number;
+  bed_id?: number | null;
+}
+
+export interface WardOccupancyChartDatum {
+  name: string;
+  Available: number;
+  Occupied: number;
+  Reserved: number;
 }
 
 export interface TriageScore {

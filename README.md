@@ -77,19 +77,29 @@ cd ITERYX
 cp .env.example .env
 
 # 3. Build and start all services
-docker-compose up --build
+docker compose up --build
 
 # 4. Train ML models (first time only)
-docker exec backend python train_models.py
+docker exec iteryx-backend python backend/ml/train_models.py
 
 # 5. Seed sample data (first time only)
-docker exec backend python seed_data.py
+docker exec iteryx-backend python backend/seed_data.py
 
 # 6. Open the dashboard
 #    → http://localhost:3000
 ```
 
 > **Note:** Step 3 starts PostgreSQL, Redis, the FastAPI backend, and the Next.js frontend — all in one command.
+
+### Local Run Checklist
+
+If you are not using Docker, make sure all of the following are available before starting the app:
+
+- PostgreSQL 15 running on `localhost:5432`
+- Redis 7 running on `localhost:6379`
+- Python dependencies installed with `pip install -r backend/requirements.txt`
+- Frontend dependencies installed with `npm install` inside `frontend`
+- `.env` created from `.env.example`
 
 ---
 

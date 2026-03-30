@@ -1,4 +1,10 @@
 import { io, Socket } from "socket.io-client";
+import type {
+  BedStatusUpdateEvent,
+  DischargeOrderUpdateEvent,
+  EmergencyAlertPayload,
+  QueueUpdatePayload,
+} from "@/types";
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:8000";
 
@@ -37,16 +43,26 @@ export const socketService = {
   getSocket,
   joinWard,
   leaveWard,
-  onEmergencyAlert: (callback: (data: any) => void) => {
+  onEmergencyAlert: (callback: (data: EmergencyAlertPayload) => void) => {
     getSocket().on("emergency_alert", callback);
   },
-  onQueueUpdate: (callback: (data: any) => void) => {
+  onQueueUpdate: (callback: (data: QueueUpdatePayload) => void) => {
     getSocket().on("queue_update", callback);
   },
-  onBedStatusUpdate: (callback: (data: any) => void) => {
+  onBedStatusUpdate: (callback: (data: BedStatusUpdateEvent) => void) => {
     getSocket().on("bed_status_update", callback);
   },
-  removeListener: (event: string, callback?: (data: any) => void) => {
+  onDischargeOrderUpdate: (callback: (data: DischargeOrderUpdateEvent) => void) => {
+    getSocket().on("discharge_order_update", callback);
+  },
+  removeListener: (
+    event: string,
+    callback?:
+      | ((data: EmergencyAlertPayload) => void)
+      | ((data: QueueUpdatePayload) => void)
+      | ((data: BedStatusUpdateEvent) => void)
+      | ((data: DischargeOrderUpdateEvent) => void)
+  ) => {
     if (callback) {
       getSocket().off(event, callback);
     } else {

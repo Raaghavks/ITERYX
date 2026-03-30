@@ -67,8 +67,8 @@ export default function OPDRegisterPage() {
         symptoms: form.symptoms.map((s) => ({ symptom: s })),
       });
       setResult(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Registration failed.");
     } finally {
       setLoading(false);
     }

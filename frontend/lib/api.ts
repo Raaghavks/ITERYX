@@ -12,6 +12,14 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
+type ApiEnvelope<T> = {
+  success: boolean;
+  data: T;
+  message?: string;
+  error?: string;
+  details?: Array<{ field?: string; message?: string }>;
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -23,10 +31,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || error.message || res.statusText);
+    throw new Error(error.error || error.detail || error.message || res.statusText);
   }
 
-  return res.json();
+  const payload = await res.json();
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "success" in payload &&
+    "data" in payload
+  ) {
+    return (payload as ApiEnvelope<T>).data;
+  }
+
+  return payload as T;
 }
 
 function initialsFromName(name?: string | null): string | undefined {
@@ -49,6 +68,9 @@ type BedsResponse = {
       status: Bed["status"];
       assigned_patient_id?: number | null;
       patient_name?: string | null;
+      admitted_since?: string | null;
+      doctor_id?: number | null;
+      assigned_doctor?: string | null;
     }>;
   }>;
 };
@@ -67,6 +89,9 @@ export async function getAllBeds(): Promise<Bed[]> {
       assigned_patient_id: bed.assigned_patient_id ?? null,
       patient_name: bed.patient_name ?? null,
       patient_initials: initialsFromName(bed.patient_name),
+      admitted_since: bed.admitted_since ?? undefined,
+      doctor_id: bed.doctor_id ?? null,
+      assigned_doctor: bed.assigned_doctor ?? undefined,
     }))
   );
 }
@@ -127,7 +152,7 @@ export async function registerPatient(data: {
   };
   symptoms: Array<{ symptom: string }>;
 }): Promise<RegistrationResult> {
-  const reg = await request<{ data: { patient_id: number } }>("/patients/register", {
+  const reg = await request<{ patient_id: number }>("/patients/register", {
     method: "POST",
     body: JSON.stringify({
       name: data.name,
@@ -149,22 +174,23 @@ export async function registerPatient(data: {
   });
 
   const score = await request<{
-    data: {
-      score: number;
-      priority_level: RegistrationResult["priority_level"];
-      queue_position: number;
-    };
+    score: number;
+    priority_level: RegistrationResult["priority_level"];
+    queue_position: number;
   }>("/triage/score", {
     method: "POST",
-    body: JSON.stringify({ patient_id: reg.data.patient_id }),
+    body: JSON.stringify({
+      patient_id: reg.patient_id,
+      doctor_id: data.doctor_id,
+    }),
   });
 
   return {
-    patient_id: reg.data.patient_id,
+    patient_id: reg.patient_id,
     name: data.name,
-    triage_score: score.data.score,
-    priority_level: score.data.priority_level,
-    queue_position: score.data.queue_position,
+    triage_score: score.score,
+    priority_level: score.priority_level,
+    queue_position: score.queue_position,
   };
 }
 
@@ -237,19 +263,27 @@ export async function getPendingDischarges(): Promise<DischargeOrder[]> {
   const data = await request<
     Array<{
       order_id: number;
+      patient_id: number;
+      bed_id: number | null;
+      doctor_id: number;
       patient_name: string;
       ward_name: string;
       bed_number: string;
       expected_discharge_at: string;
+      confirmed_at?: string | null;
     }>
   >("/discharge-orders/pending");
 
   return data.map((discharge) => ({
     id: discharge.order_id,
+    patient_id: discharge.patient_id,
+    bed_id: discharge.bed_id,
+    doctor_id: discharge.doctor_id,
     patient_name: discharge.patient_name,
     ward_name: discharge.ward_name,
     bed_number: discharge.bed_number,
     expected_discharge_at: discharge.expected_discharge_at,
+    confirmed_at: discharge.confirmed_at ?? null,
   }));
 }
 
@@ -273,6 +307,32 @@ export async function createAdmission(patientId: number, bedId: number, doctorId
       patient_id: patientId,
       bed_id: bedId,
       doctor_id: doctorId,
+    }),
+  });
+}
+
+export async function createDischargeOrder(
+  patientId: number,
+  bedId: number,
+  doctorId: number,
+  expectedDischargeAt: string
+) {
+  return request("/discharge-orders", {
+    method: "POST",
+    body: JSON.stringify({
+      patient_id: patientId,
+      bed_id: bedId,
+      doctor_id: doctorId,
+      expected_discharge_at: expectedDischargeAt,
+    }),
+  });
+}
+
+export async function confirmDischargeOrder(orderId: number, confirmedBy?: number) {
+  return request(`/discharge-orders/${orderId}/confirm`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      confirmed_by: confirmedBy,
     }),
   });
 }

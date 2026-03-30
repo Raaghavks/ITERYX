@@ -1,14 +1,19 @@
 import os
 from contextlib import asynccontextmanager
-from typing import Any
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 import redis.asyncio as redis
 from dotenv import load_dotenv
 
+from backend.api_contract import (
+    http_exception_handler,
+    success_response,
+    validation_exception_handler,
+)
 from backend.database import Base, engine, get_async_db, get_db
 from backend.routes.admissions import router as admissions_router
 from backend.routes.beds import router as beds_router
@@ -39,6 +44,9 @@ app = FastAPI(
     title="Hospital System API",
     lifespan=lifespan
 )
+
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 # CORS - allow all origins for development
 app.add_middleware(
@@ -73,18 +81,13 @@ async def get_all_doctors(db=Depends(get_async_db)):
             """
         )
         rows = cur.fetchall()
-        return [dict(r) for r in rows]
+        return success_response(
+            data=[dict(r) for r in rows],
+            message="Doctors retrieved",
+        )
 
 # Mount Socket.IO
 app.mount("/socket.io", socket_app)
-
-# Helper for standardized responses
-def standard_response(success: bool, data: Any = None, message: str = ""):
-    return {
-        "success": success,
-        "data": data,
-        "message": message
-    }
 
 @app.get("/health")
 async def health_check(db: AsyncSession = Depends(get_async_db)):
@@ -101,12 +104,11 @@ async def health_check(db: AsyncSession = Depends(get_async_db)):
     except Exception:
         redis_status = "disconnected"
         
-    return standard_response(
-        success=(db_status == "connected" and redis_status == "connected"),
+    return success_response(
         data={"db": db_status, "redis": redis_status},
         message="System health status"
     )
 
 @app.get("/")
 async def root():
-    return standard_response(True, message="Welcome to the Hospital System API")
+    return success_response(message="Welcome to the Hospital System API")

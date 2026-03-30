@@ -5,18 +5,31 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend,
 } from "recharts";
-import { Users, ListOrdered, BedDouble, AlertTriangle, Trash2, Activity, LayoutDashboard } from "lucide-react";
+import { Users, ListOrdered, BedDouble, AlertTriangle, Trash2, Activity, LayoutDashboard, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
-import { getDashboardKPIs, getAllWards, getAllBeds, getPendingDischarges } from "@/lib/api";
+import { confirmDischargeOrder, getDashboardKPIs, getAllWards, getAllBeds, getPendingDischarges } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import type { DashboardKPIs, DischargeOrder, EmergencyAlert, Ward, Bed, BedStatus } from "@/types";
+import type {
+  Bed,
+  BedStatusUpdateEvent,
+  DashboardKPIs,
+  DischargeOrder,
+  EmergencyAlert,
+  EmergencyAlertPayload,
+  QueueUpdatePayload,
+  Ward,
+  WardOccupancyChartDatum,
+} from "@/types";
 
 export default function AdminDashboardPage() {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<WardOccupancyChartDatum[]>([]);
   const [discharges, setDischarges] = useState<DischargeOrder[]>([]);
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
+  const [processingDischargeId, setProcessingDischargeId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Load initial data
   const loadAll = useCallback(async () => {
@@ -62,35 +75,59 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const socket = getSocket();
 
-    socket.on("queue_update", (data: Partial<DashboardKPIs>) => {
-      setKpis((prev) =>
-        prev
-          ? {
-              ...prev,
-              totalPatientsToday: data.totalPatientsToday ?? prev.totalPatientsToday,
-              currentQueueLength: data.currentQueueLength ?? prev.currentQueueLength,
-              criticalPatients: data.criticalPatients ?? prev.criticalPatients,
-            }
-          : prev
-      );
+    socket.on("queue_update", (data: QueueUpdatePayload) => {
+      if (data.totalPatientsToday !== undefined || data.currentQueueLength !== undefined || data.criticalPatients !== undefined) {
+        setKpis((prev) =>
+          prev
+            ? {
+                ...prev,
+                totalPatientsToday: data.totalPatientsToday ?? prev.totalPatientsToday,
+                currentQueueLength: data.currentQueueLength ?? prev.currentQueueLength,
+                criticalPatients: data.criticalPatients ?? prev.criticalPatients,
+              }
+            : prev
+        );
+      } else {
+        loadAll().catch(() => {});
+      }
     });
 
-    socket.on("bed_status_update", ({ new_status }: { bed_id: number; new_status: BedStatus; ward_id: number }) => {
-      // Reload KPIs to get fresh occupancy
-      getDashboardKPIs().then(setKpis).catch(() => {});
+    socket.on("bed_status_update", ({ bed_id }: BedStatusUpdateEvent) => {
+      if (bed_id) {
+        loadAll().catch(() => {});
+      }
     });
 
-    socket.on("emergency_alert", (data: Omit<EmergencyAlert, "id">) => {
+    socket.on("emergency_alert", (data: EmergencyAlertPayload) => {
       const alert: EmergencyAlert = { ...data, id: crypto.randomUUID() };
       setAlerts((prev) => [alert, ...prev].slice(0, 10));
+    });
+
+    socket.on("discharge_order_update", () => {
+      loadAll().catch(() => {});
     });
 
     return () => {
       socket.off("queue_update");
       socket.off("bed_status_update");
       socket.off("emergency_alert");
+      socket.off("discharge_order_update");
     };
-  }, []);
+  }, [loadAll]);
+
+  async function handleConfirmDischarge(order: DischargeOrder) {
+    setProcessingDischargeId(order.id);
+    setActionError(null);
+    try {
+      await confirmDischargeOrder(order.id, order.doctor_id);
+      setNotice(`${order.patient_name} discharged and ${order.bed_number} is now available.`);
+      await loadAll();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not complete discharge.");
+    } finally {
+      setProcessingDischargeId(null);
+    }
+  }
 
   function getDischargeColor(isoTime: string) {
     const diff = (new Date(isoTime).getTime() - Date.now()) / 60000;
@@ -122,6 +159,18 @@ export default function AdminDashboardPage() {
       </header>
 
       <div className="max-w-[1600px] mx-auto p-6 space-y-6">
+        {notice && (
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+            {notice}
+          </div>
+        )}
+
+        {actionError && (
+          <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {actionError}
+          </div>
+        )}
+
         {/* SECTION 1: KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {kpiCards.map((card) => {
@@ -186,9 +235,19 @@ export default function AdminDashboardPage() {
                         <span className="text-[10px] bg-slate-200/60 text-slate-600 px-2 py-0.5 rounded font-semibold uppercase">Bed: {d.bed_number}</span>
                       </div>
                     </div>
-                    <span className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${getDischargeColor(d.expected_discharge_at)}`}>
-                      Expected: {new Date(d.expected_discharge_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
-                    </span>
+                    <div className="flex flex-col items-start gap-2 sm:items-end">
+                      <span className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${getDischargeColor(d.expected_discharge_at)}`}>
+                        Expected: {new Date(d.expected_discharge_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
+                      </span>
+                      <button
+                        onClick={() => handleConfirmDischarge(d)}
+                        disabled={processingDischargeId === d.id}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {processingDischargeId === d.id ? "Completing..." : "Confirm Discharge"}
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

@@ -12,4 +12,4 @@ ENV NEXT_PUBLIC_SOCKET_URL=$NEXT_PUBLIC_SOCKET_URL
 RUN npm run build
 
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["npm", "start", "--", "-H", "0.0.0.0"]

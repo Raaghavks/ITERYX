@@ -37,7 +37,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
     networks:
       - iteryx-network
 
