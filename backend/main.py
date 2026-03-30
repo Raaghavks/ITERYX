@@ -15,6 +15,7 @@ from backend.routes.beds import router as beds_router
 from backend.routes.triage import router as triage_router
 from backend.routes.triage import router_patients as patients_router
 from backend.routes.triage import router_queue as queue_router
+from backend.routes.dashboard import router as dashboard_router
 from backend.sockets.events import socket_app
 import backend.models
 
@@ -54,6 +55,15 @@ app.include_router(admissions_router)
 app.include_router(triage_router)
 app.include_router(patients_router)
 app.include_router(queue_router)
+app.include_router(dashboard_router)
+
+# Extra: Inline Doctor listing for registration
+@app.get("/api/doctors", tags=["Doctors"])
+async def get_all_doctors(db=Depends(get_async_db)):
+    with get_db() as cur:
+        cur.execute("SELECT id, name, specialization, is_available as status FROM doctors")
+        rows = cur.fetchall()
+        return [dict(r) for r in rows]
 
 # Mount Socket.IO
 app.mount("/socket.io", socket_app)

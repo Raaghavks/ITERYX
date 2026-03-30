@@ -1,46 +1,56 @@
-import { io, Socket } from 'socket.io-client';
+import { io, Socket } from "socket.io-client";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:8000";
 
-class SocketService {
-  private static instance: SocketService;
-  public socket: Socket;
+let socket: Socket | null = null;
 
-  private constructor() {
-    this.socket = io(SOCKET_URL, {
+export function getSocket(): Socket {
+  if (!socket) {
+    socket = io(SOCKET_URL, {
+      path: "/socket.io",
+      transports: ["websocket"],
       autoConnect: true,
-      transports: ['websocket'],
+    });
+
+    socket.on("connect", () => {
+      console.log("WebSocket connected to:", SOCKET_URL);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("WebSocket disconnected");
     });
   }
-
-  public static getInstance(): SocketService {
-    if (!SocketService.instance) {
-      SocketService.instance = new SocketService();
-    }
-    return SocketService.instance;
-  }
-
-  // Typed listeners
-  public onQueueUpdate(callback: (data: unknown) => void) {
-    this.socket.on('queue_update', callback);
-  }
-
-  public onBedStatusUpdate(callback: (data: unknown) => void) {
-    this.socket.on('bed_status_update', callback);
-  }
-
-  public onEmergencyAlert(callback: (data: unknown) => void) {
-    this.socket.on('emergency_alert', callback);
-  }
-
-  public removeListener(event: string, callback?: (data: unknown) => void) {
-    if (callback) {
-      this.socket.off(event, callback);
-    } else {
-      this.socket.off(event);
-    }
-  }
+  return socket;
 }
 
-export const socketService = SocketService.getInstance();
-export const socket = socketService.socket;
+export function joinWard(wardId: number): void {
+  const s = getSocket();
+  s.emit("join_ward", { ward_id: wardId });
+}
+
+export function leaveWard(wardId: number): void {
+  const s = getSocket();
+  s.emit("leave_ward", { ward_id: wardId });
+}
+
+export const socketService = {
+  getSocket,
+  joinWard,
+  leaveWard,
+  onEmergencyAlert: (callback: (data: any) => void) => {
+    getSocket().on("emergency_alert", callback);
+  },
+  onQueueUpdate: (callback: (data: any) => void) => {
+    getSocket().on("queue_update", callback);
+  },
+  onBedStatusUpdate: (callback: (data: any) => void) => {
+    getSocket().on("bed_status_update", callback);
+  },
+  removeListener: (event: string, callback?: (data: any) => void) => {
+    if (callback) {
+      getSocket().off(event, callback);
+    } else {
+      getSocket().off(event);
+    }
+  }
+};
