@@ -9,32 +9,47 @@ import type {
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:8000";
 
 let socket: Socket | null = null;
+const joinedWards = new Set<number>();
 
 export function getSocket(): Socket {
   if (!socket) {
     socket = io(SOCKET_URL, {
       path: "/socket.io",
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000,
     });
 
     socket.on("connect", () => {
       console.log("WebSocket connected to:", SOCKET_URL);
+      joinedWards.forEach((wardId) => {
+        socket?.emit("join_ward", { ward_id: wardId });
+      });
     });
 
-    socket.on("disconnect", () => {
-      console.log("WebSocket disconnected");
+    socket.on("disconnect", (reason) => {
+      console.log("WebSocket disconnected:", reason);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.warn("WebSocket connection error:", error.message);
     });
   }
   return socket;
 }
 
 export function joinWard(wardId: number): void {
+  joinedWards.add(wardId);
   const s = getSocket();
   s.emit("join_ward", { ward_id: wardId });
 }
 
 export function leaveWard(wardId: number): void {
+  joinedWards.delete(wardId);
   const s = getSocket();
   s.emit("leave_ward", { ward_id: wardId });
 }
