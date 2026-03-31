@@ -6,7 +6,7 @@ export default async function DoctorLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireSession(["doctor", "administrator"]);
+  const session = await requireSession(["doctor", "administrator", "receptionist"]);
 
   return <PortalShell user={session}>{children}</PortalShell>;
 }

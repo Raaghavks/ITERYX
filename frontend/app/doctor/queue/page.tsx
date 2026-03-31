@@ -94,6 +94,12 @@ export default function DoctorQueuePage() {
     };
   }, [load]);
 
+  // The realtime hook intentionally does not re-run when load callback identity changes,
+  // so force a refresh whenever the status tab filter changes.
+  useEffect(() => {
+    void load();
+  }, [filter, load]);
+
   async function changeStatus(id: number, newStatus: string) {
     setUpdating(id);
     try {
@@ -153,6 +159,13 @@ export default function DoctorQueuePage() {
   }
 
   const filterButtons: QueueFilter[] = ["waiting", "in_consultation", "completed", "all"];
+  const statusFilteredEntries =
+    filter === "all" ? entries : entries.filter((entry) => entry.status === filter);
+
+  const emergencyEntries = statusFilteredEntries.filter((entry) => {
+    const priority = entry.triage?.priority_level ?? entry.priority_level ?? "LOW";
+    return priority === "CRITICAL" || priority === "HIGH";
+  });
 
   return (
     <section className="space-y-6">
@@ -239,14 +252,14 @@ export default function DoctorQueuePage() {
           <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
           Loading queue...
         </div>
-      ) : entries.length === 0 ? (
+      ) : emergencyEntries.length === 0 ? (
         <div className="rounded-[32px] border border-white/80 bg-white/95 py-24 text-center text-slate-400 shadow-[0_30px_70px_-50px_rgba(15,23,42,0.45)]">
           <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-slate-200" />
-          <p className="font-medium">No patients in this queue</p>
+          <p className="font-medium">No critical or high-priority patients in this queue</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {entries.map((entry, index) => {
+          {emergencyEntries.map((entry, index) => {
             const priority = entry.triage?.priority_level ?? "LOW";
             const style = PRIORITY_STYLES[priority];
 

@@ -39,14 +39,15 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Patients", href: "/opd/register", icon: Users, roles: ["administrator", "receptionist"] },
   { label: "Bed Allocation", href: "/admin/beds", icon: BedDouble, roles: ["administrator", "doctor"] },
   { label: "Staff", icon: Stethoscope, roles: ["administrator"], disabled: true },
-  { label: "Appointments", icon: CalendarDays, roles: ["administrator"], disabled: true },
-  { label: "Emergency", href: "/doctor/queue", icon: ShieldAlert, roles: ["administrator", "doctor"] },
+  { label: "Appointments", href: "/doctor/appointments", icon: CalendarDays, roles: ["administrator", "doctor", "receptionist"] },
+  { label: "Emergency", href: "/doctor/queue", icon: ShieldAlert, roles: ["administrator", "doctor", "receptionist"] },
 ];
 
 const PAGE_TITLES: Array<{ match: string; label: string; kicker: string }> = [
   { match: "/admin/dashboard", label: "Hospital Dashboard", kicker: "Live Overview" },
   { match: "/admin/pilot", label: "Pilot Readiness", kicker: "Stakeholder Demo Control" },
   { match: "/admin/beds", label: "Bed Allocation", kicker: "Operational Bed Control" },
+  { match: "/doctor/appointments", label: "Appointments", kicker: "Priority-Wide Queue View" },
   { match: "/doctor/queue", label: "Doctor Queue", kicker: "Clinical Triage Flow" },
   { match: "/opd/register", label: "Patient Intake", kicker: "Registration & Triage" },
 ];
@@ -76,9 +77,9 @@ export function PortalShell({ user, children }: PortalShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_48%,#f7fafc_100%)] text-slate-900">
-      <div className="flex min-h-screen">
-        <aside className="hidden xl:flex w-[280px] flex-col border-r border-slate-200/70 bg-white/88 px-4 py-5 backdrop-blur-xl">
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_48%,#f7fafc_100%)] text-slate-900">
+      <div className="flex h-full">
+        <aside className="hidden xl:flex h-screen w-[280px] flex-col border-r border-slate-200/70 bg-white/88 px-4 py-5 backdrop-blur-xl">
           <div className="flex items-center gap-3 rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.35)]">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-700 text-white shadow-lg shadow-sky-200">
               <Activity className="h-6 w-6" />
@@ -87,7 +88,7 @@ export function PortalShell({ user, children }: PortalShellProps) {
               <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-500">
                 Care Operations
               </p>
-              <h2 className="text-xl font-black tracking-tight text-slate-900">
+              <h2 className="text-xl font-black leading-tight tracking-tight text-slate-900">
                 MediCare HMS
               </h2>
             </div>
@@ -137,7 +138,7 @@ export function PortalShell({ user, children }: PortalShellProps) {
                   {user.avatarInitials}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900">{user.name}</p>
+                  <p className="text-sm font-bold leading-tight text-slate-900">{user.name}</p>
                   <p className="text-xs text-slate-500">{user.department}</p>
                 </div>
               </div>
@@ -162,8 +163,8 @@ export function PortalShell({ user, children }: PortalShellProps) {
           </div>
         </aside>
 
-        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <header className="border-b border-slate-200/60 bg-white/72 px-5 py-4 backdrop-blur-xl sm:px-7">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="shrink-0 border-b border-slate-200/60 bg-white/72 px-5 py-4 backdrop-blur-xl sm:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
@@ -197,7 +198,7 @@ export function PortalShell({ user, children }: PortalShellProps) {
             </div>
           </header>
 
-          <main className="flex-1 px-5 py-5 sm:px-7">{children}</main>
+          <main className="flex-1 overflow-y-auto px-5 py-5 sm:px-7">{children}</main>
         </div>
       </div>
     </div>
